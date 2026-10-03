@@ -383,3 +383,76 @@ EXCEL EXPORT
     width: 100%;
   }
 }
+
+
+/* =========================================================
+   V1.0 DAILY PLAN / แท็บงานแบบเลือกจากปฏิทิน + งานนอก
+   ========================================================= */
+.version-chip{display:inline-flex;align-items:center;justify-content:center;padding:6px 9px;border-radius:999px;background:#f0f4fa;color:#748197;font-size:11px;font-weight:700}
+.plan-date-card{display:grid;grid-template-columns:46px minmax(0,1fr) 46px;align-items:center;gap:10px;margin-bottom:10px;padding:14px;border:1px solid #dfe7f2;border-radius:20px;background:#fbfdff}
+.plan-date-arrow{width:44px;height:44px;border:0;border-radius:14px;background:#edf4ff;color:#2878ff;font-size:28px;line-height:1}
+.plan-date-center{min-width:0;text-align:center}.plan-date-center small{display:block;margin-bottom:3px;color:#8793a8;font-size:11px}.plan-date-center strong{display:block;margin-bottom:7px;color:#16245c;font-size:18px}.plan-date-center input{max-width:190px;margin:auto;padding:8px 10px;text-align:center}
+.plan-today-row{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0 0 14px}.plan-today-row .progress-text{margin:0;text-align:right}
+.plan-actions{display:grid;grid-template-columns:1.25fr 1fr;gap:9px;margin-bottom:24px}.plan-actions .primary-btn,.plan-actions .small-add-btn{min-height:46px}
+.plan-list-section{margin-bottom:24px}.plan-list-section .section-title-row{margin-bottom:10px}
+.plan-overdue-section{margin-top:18px;padding-top:18px;border-top:1px solid #edf1f6}.plan-overdue-section.hidden{display:none}.plan-overdue-section .section-title-row small{color:#df415d}.overdue-task-row{display:flex;align-items:center;gap:9px;margin-bottom:8px;padding:11px;border:1px solid #f2dbe0;border-radius:14px;background:#fffafb}.overdue-task-main{flex:1;min-width:0}.overdue-task-main strong{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.overdue-task-main small{color:#8b97aa}.move-today-btn{flex:0 0 auto;border:0;border-radius:10px;padding:8px 10px;background:#fff0f3;color:#df415d;font-size:12px;font-weight:700}
+.task-source-badge{display:inline-flex;align-items:center;gap:4px;padding:3px 7px;border-radius:999px;background:#eef4ff;color:#2878ff;font-size:10px;font-weight:700}
+.source-detail-row{margin-top:3px}.source-open-btn{width:100%;margin:6px 0 4px;padding:11px;border:1px solid #d9e5fa;border-radius:12px;background:#f4f8ff;color:#2878ff;font-weight:700}.source-open-btn.hidden,.source-detail-row.hidden{display:none}
+.source-picker-box{max-width:520px}.source-picker-date{margin:-8px 0 14px;color:#6e7b90}.source-picker-tools{position:sticky;top:-24px;z-index:3;margin:0 -4px 12px;padding:10px 4px 8px;background:#fff}.source-picker-tools input{width:100%;padding:12px;border:1px solid #dce3ed;border-radius:12px;font-size:16px;outline:0}.source-picker-tools input:focus{border-color:#2878ff}.source-filter-row{display:flex;gap:7px;margin-top:9px;overflow-x:auto;padding-bottom:2px}.source-filter{flex:0 0 auto;border:0;border-radius:999px;padding:8px 11px;background:#f0f3f8;color:#69758a;font-size:12px;font-weight:700}.source-filter.active{background:#2878ff;color:#fff}
+.source-picker-list{display:grid;gap:10px;min-height:120px}.source-group-title{display:flex;align-items:center;justify-content:space-between;margin-top:4px;color:#536176;font-size:12px;font-weight:700}.source-choice{position:relative;display:flex;align-items:flex-start;gap:11px;margin:0;padding:13px;border:1px solid #e1e7f0;border-radius:15px;background:#fbfcfe;cursor:pointer}.source-choice input{position:absolute;opacity:0;pointer-events:none}.source-choice-box{display:flex;align-items:center;justify-content:center;flex:0 0 23px;width:23px;height:23px;margin-top:1px;border:2px solid #c8d2e2;border-radius:6px;background:#fff;color:transparent;font-size:13px}.source-choice input:checked+.source-choice-box{border-color:#2878ff;background:#2878ff;color:#fff}.source-choice:has(input:checked){border-color:#9fc2ff;background:#f3f7ff}.source-choice.disabled{opacity:.55;cursor:default}.source-choice-main{min-width:0;flex:1}.source-choice-main strong{display:block;margin-bottom:4px;color:#17233f}.source-choice-main small{display:block;color:#8793a8;line-height:1.45}.source-choice-main .already-added{margin-top:5px;color:#14a673;font-weight:700}.source-picker-empty{padding:24px;border-radius:14px;background:#f8fbff;color:#98a3b5;text-align:center}.source-picker-footer{position:sticky;bottom:-24px;display:flex;align-items:center;justify-content:space-between;gap:12px;margin:14px -4px -4px;padding:12px 4px 4px;background:#fff;border-top:1px solid #edf1f6}.source-picker-footer span{color:#6f7c91;font-size:12px}.source-add-selected{width:auto;min-width:150px;margin:0}.source-add-selected:disabled{opacity:.5;cursor:not-allowed}
+
+@media(max-width:500px){.plan-actions{grid-template-columns:1fr}.source-picker-box{max-height:92vh}.source-picker-footer{bottom:-24px}.plan-date-center strong{font-size:16px}}
+
+
+/* v1.1 freelance work update */
+.auto-update-hint{
+  margin:6px 0 0;
+  color:#8a96a9;
+  font-size:11px;
+  line-height:1.4;
+}
+.freelance-latest-update{
+  margin:-2px 0 12px;
+  padding:10px 11px;
+  border-radius:12px;
+  background:#f7f9fc;
+}
+.freelance-latest-update p{
+  margin:0;
+  color:#4e5b70;
+  font-size:13px;
+  line-height:1.45;
+  overflow-wrap:anywhere;
+}
+.freelance-latest-update small{
+  display:block;
+  margin-top:5px;
+  color:#919caf;
+  font-size:10px;
+}
+.freelance-update-detail{
+  margin:4px 0 14px;
+  padding:14px;
+  border:1px solid #e3eaf4;
+  border-radius:14px;
+  background:#f8fbff;
+}
+.freelance-update-detail small{
+  display:block;
+  margin-bottom:5px;
+  color:#758298;
+  font-weight:700;
+}
+.freelance-update-detail p{
+  margin:0;
+  color:#27364f;
+  line-height:1.55;
+  white-space:pre-wrap;
+  overflow-wrap:anywhere;
+}
+.freelance-update-detail span{
+  display:block;
+  margin-top:7px;
+  color:#929cad;
+  font-size:11px;
+}

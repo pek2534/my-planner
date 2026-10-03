@@ -101,6 +101,9 @@ let editingTaskId = null;
 let selectedFreelanceId = null;
 let editingFreelanceId = null;
 let taskFilter = "pending";
+let planDate = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
+let sourcePickerFilter = "all";
+const sourceSelection = new Set();
 
 let currentUser = null;
 let unsubscribeEvents = null;
@@ -145,7 +148,10 @@ function normalizeTasks(list) {
     priority: task.priority || "normal",
     completed: Boolean(task.completed),
     date: task.date || formatDateKey(new Date()),
-    note: task.note || ""
+    note: task.note || "",
+    sourceType: task.sourceType || "custom",
+    sourceId: task.sourceId ? String(task.sourceId) : "",
+    sourceLabel: task.sourceLabel || ""
   }));
 }
 
@@ -157,6 +163,8 @@ function normalizeFreelance(list) {
     clientName: normalizeClientName(project.clientName || project.client || "ไม่ระบุผู้ว่าจ้าง"),
     name: project.name || "ไม่มีชื่อโปรเจกต์",
     status: freelanceStatuses[project.status] ? project.status : "in_progress",
+    latestUpdate: String(project.latestUpdate || project.workUpdate || "").trim(),
+    latestUpdateAt: project.latestUpdateAt || project.workUpdateAt || "",
     totalAmount: Math.max(0, Number(project.totalAmount) || 0),
     receivedAmount: Math.max(0, Number(project.receivedAmount) || 0)
   }));
@@ -173,6 +181,26 @@ function clientGroupKey(value) {
 
 function freelanceStatusInfo(value) {
   return freelanceStatuses[value] || freelanceStatuses.in_progress;
+}
+
+function updateDateObject(value) {
+  if (!value) return null;
+  if (value instanceof Date) return value;
+  if (typeof value?.toDate === "function") return value.toDate();
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function formatFreelanceUpdateDate(value) {
+  const date = updateDateObject(value);
+  if (!date) return "";
+  return date.toLocaleString("th-TH", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit"
+  });
 }
 
 function makeId(prefix) {
@@ -295,6 +323,9 @@ function firestoreTaskData(task) {
     completed: Boolean(task.completed),
     date: task.date,
     note: task.note || "",
+    sourceType: task.sourceType || "custom",
+    sourceId: task.sourceId ? String(task.sourceId) : "",
+    sourceLabel: task.sourceLabel || "",
     updatedAt: serverTimestamp()
   };
 }
@@ -304,6 +335,8 @@ function firestoreFreelanceData(project) {
     clientName: normalizeClientName(project.clientName),
     name: project.name,
     status: freelanceStatuses[project.status] ? project.status : "in_progress",
+    latestUpdate: String(project.latestUpdate || "").trim(),
+    latestUpdateAt: project.latestUpdateAt || "",
     totalAmount: Number(project.totalAmount) || 0,
     receivedAmount: Number(project.receivedAmount) || 0,
     updatedAt: serverTimestamp()
@@ -622,6 +655,14 @@ function createTaskCard(task) {
   if (task.priority === "high") priority.className = "priority-high";
 
   meta.append(date, taskCategories, priority);
+
+  if (task.sourceType && task.sourceType !== "custom") {
+    const sourceBadge = document.createElement("span");
+    sourceBadge.className = "task-source-badge";
+    sourceBadge.textContent = task.sourceType === "event" ? "🔗 นัดหมาย" : "💼 งานนอก";
+    meta.appendChild(sourceBadge);
+  }
+
   main.append(title, meta);
   main.addEventListener("click", () => openTaskDetail(task.id));
   card.append(check, main);
@@ -802,24 +843,84 @@ function renderSelectedDate() {
 
 function renderTaskPage() {
   allTaskList.innerHTML = "";
-  const todayKey = formatDateKey(new Date());
-  let list = [...tasks];
+  const key = formatDateKey(planDate);
+  const dayTasks = tasks
+    .filter(task => task.date === key)
+    .sort((a, b) => {
+      if (a.completed !== b.completed) return a.completed ? 1 : -1;
+      const order = { urgent: 0, high: 1, normal: 2 };
+      const byPriority = (order[a.priority] ?? 2) - (order[b.priority] ?? 2);
+      if (byPriority !== 0) return byPriority;
+      return a.title.localeCompare(b.title, "th");
+    });
 
-  if (taskFilter === "pending") list = list.filter(task => !task.completed);
-  if (taskFilter === "today") list = list.filter(task => task.date === todayKey);
-  if (taskFilter === "done") list = list.filter(task => task.completed);
-
-  list.sort((a, b) => {
-    if (a.completed !== b.completed) return a.completed ? 1 : -1;
-    return a.date.localeCompare(b.date);
+  const completed = dayTasks.filter(task => task.completed).length;
+  $("plan-task-summary").textContent = `${completed} / ${dayTasks.length} งานเสร็จแล้ว`;
+  $("plan-date-title").textContent = planDate.toLocaleDateString("th-TH", {
+    weekday: "long", day: "numeric", month: "long", year: "numeric"
   });
+  $("plan-date-input").value = key;
+  $("plan-list-title").textContent = key === formatDateKey(new Date()) ? "งานที่เลือกไว้วันนี้" : "งานที่เลือกไว้วันนี้นั้น";
 
-  if (!list.length) {
-    allTaskList.appendChild(emptyMessage("ยังไม่มีงานในรายการนี้"));
+  if (!dayTasks.length) {
+    allTaskList.appendChild(emptyMessage("วันนี้ยังไม่ได้เลือกงาน • กด “เลือกจากงานที่มี” หรือเพิ่มงานใหม่ได้เลย"));
+  } else {
+    dayTasks.forEach(task => allTaskList.appendChild(createTaskCard(task)));
+  }
+
+  renderOverdueTasks();
+}
+
+function renderOverdueTasks() {
+  const section = $("plan-overdue-section");
+  const list = $("plan-overdue-list");
+  const key = formatDateKey(planDate);
+  const overdue = tasks
+    .filter(task => !task.completed && task.date < key)
+    .sort((a, b) => b.date.localeCompare(a.date))
+    .slice(0, 8);
+
+  list.innerHTML = "";
+  if (!overdue.length) {
+    section.classList.add("hidden");
     return;
   }
 
-  list.forEach(task => allTaskList.appendChild(createTaskCard(task)));
+  section.classList.remove("hidden");
+  $("plan-overdue-count").textContent = `${overdue.length} รายการ`;
+
+  overdue.forEach(task => {
+    const row = document.createElement("div");
+    row.className = "overdue-task-row";
+
+    const main = document.createElement("div");
+    main.className = "overdue-task-main";
+    const title = document.createElement("strong");
+    title.textContent = task.title;
+    const meta = document.createElement("small");
+    meta.textContent = `เดิม ${dateFromKey(task.date).toLocaleDateString("th-TH", { day: "numeric", month: "short" })}`;
+    main.append(title, meta);
+    main.addEventListener("click", () => openTaskDetail(task.id));
+
+    const move = document.createElement("button");
+    move.type = "button";
+    move.className = "move-today-btn";
+    move.textContent = "ย้ายมาวันนี้";
+    move.addEventListener("click", async event => {
+      event.stopPropagation();
+      if (!currentUser) return;
+      try {
+        setSyncState("กำลังย้ายงาน...", "busy");
+        await setDoc(userDoc("tasks", task.id), firestoreTaskData({ ...task, date: key }), { merge: true });
+      } catch (error) {
+        console.error(error);
+        alert("ย้ายงานไม่สำเร็จ กรุณาลองใหม่");
+      }
+    });
+
+    row.append(main, move);
+    list.appendChild(row);
+  });
 }
 
 function createFreelanceCard(project) {
@@ -849,7 +950,27 @@ function createFreelanceCard(project) {
     moneyGrid.appendChild(box);
   });
 
-  card.append(name, moneyGrid);
+  card.append(name);
+
+  if (project.latestUpdate) {
+    const latest = document.createElement("div");
+    latest.className = "freelance-latest-update";
+
+    const latestText = document.createElement("p");
+    latestText.textContent = `ล่าสุด: ${project.latestUpdate}`;
+    latest.appendChild(latestText);
+
+    const updateDate = formatFreelanceUpdateDate(project.latestUpdateAt);
+    if (updateDate) {
+      const latestDate = document.createElement("small");
+      latestDate.textContent = `อัปเดต ${updateDate}`;
+      latest.appendChild(latestDate);
+    }
+
+    card.appendChild(latest);
+  }
+
+  card.appendChild(moneyGrid);
   card.addEventListener("click", () => openFreelanceDetail(project.id));
   return card;
 }
@@ -1440,6 +1561,240 @@ function openEventDetail(id) {
 }
 
 // =========================================================
+// DAILY PLAN SOURCE PICKER
+// =========================================================
+
+const sourcePickerModal = $("source-picker-modal");
+const sourcePickerList = $("source-picker-list");
+const sourceSearch = $("source-search");
+
+function sourceKey(type, id) {
+  return `${type}:${id}`;
+}
+
+function sourceAlreadyInPlan(type, id) {
+  const key = formatDateKey(planDate);
+  return tasks.some(task => task.date === key && task.sourceType === type && String(task.sourceId) === String(id));
+}
+
+function eventSourceMeta(event) {
+  return `${dateFromKey(event.date).toLocaleDateString("th-TH", { day: "numeric", month: "short", year: "numeric" })} • ${event.startTime}${event.location ? ` • ${event.location}` : ""}`;
+}
+
+function sourceMatchesSearch(text, queryText) {
+  return String(text || "").toLocaleLowerCase("th-TH").includes(queryText);
+}
+
+function createSourceChoice({ type, id, title, meta, group, categories: sourceCategories = [] }) {
+  const already = sourceAlreadyInPlan(type, id);
+  const label = document.createElement("label");
+  label.className = `source-choice${already ? " disabled" : ""}`;
+  label.dataset.group = group;
+  label.dataset.search = `${title} ${meta}`.toLocaleLowerCase("th-TH");
+
+  const input = document.createElement("input");
+  input.type = "checkbox";
+  input.value = sourceKey(type, id);
+  input.disabled = already;
+  input.checked = sourceSelection.has(input.value) && !already;
+
+  const box = document.createElement("span");
+  box.className = "source-choice-box";
+  box.textContent = "✓";
+
+  const main = document.createElement("span");
+  main.className = "source-choice-main";
+  const strong = document.createElement("strong");
+  strong.textContent = title;
+  const small = document.createElement("small");
+  small.textContent = meta;
+  main.append(strong, small);
+
+  if (already) {
+    const added = document.createElement("small");
+    added.className = "already-added";
+    added.textContent = "✓ อยู่ในแผนวันนี้แล้ว";
+    main.appendChild(added);
+  }
+
+  input.addEventListener("change", () => {
+    if (input.checked) sourceSelection.add(input.value);
+    else sourceSelection.delete(input.value);
+    updateSourceSelectedCount();
+  });
+
+  label.append(input, box, main);
+  return label;
+}
+
+function appendSourceGroup(titleText, items) {
+  if (!items.length) return;
+  const header = document.createElement("div");
+  header.className = "source-group-title";
+  const title = document.createElement("span");
+  title.textContent = titleText;
+  const count = document.createElement("span");
+  count.textContent = `${items.length} รายการ`;
+  header.append(title, count);
+  sourcePickerList.appendChild(header);
+  items.forEach(item => sourcePickerList.appendChild(createSourceChoice(item)));
+}
+
+function renderSourcePicker() {
+  sourcePickerList.innerHTML = "";
+  const queryText = sourceSearch.value.trim().toLocaleLowerCase("th-TH");
+
+  const eventSort = (a, b) => {
+    const target = planDate.getTime();
+    const da = Math.abs(dateFromKey(a.date).getTime() - target);
+    const db = Math.abs(dateFromKey(b.date).getTime() - target);
+    if (da !== db) return da - db;
+    return String(a.startTime).localeCompare(String(b.startTime));
+  };
+
+  const government = events
+    .filter(event => event.categories.includes("government"))
+    .filter(event => !queryText || sourceMatchesSearch(`${event.title} ${event.location} ${event.note}`, queryText))
+    .sort(eventSort)
+    .slice(0, queryText ? 100 : 35)
+    .map(event => ({
+      type: "event", id: event.id, title: event.title, meta: eventSourceMeta(event), group: "government", categories: event.categories
+    }));
+
+  const freelance = freelanceProjects
+    .filter(project => project.status !== "paid")
+    .filter(project => !queryText || sourceMatchesSearch(`${project.name} ${project.clientName}`, queryText))
+    .sort((a, b) => a.clientName.localeCompare(b.clientName, "th") || a.name.localeCompare(b.name, "th"))
+    .map(project => ({
+      type: "freelance", id: project.id, title: project.name,
+      meta: `${project.clientName} • ${freelanceStatusInfo(project.status).name}`,
+      group: "freelance", categories: ["freelance"]
+    }));
+
+  const other = events
+    .filter(event => !event.categories.includes("government"))
+    .filter(event => !queryText || sourceMatchesSearch(`${event.title} ${event.location} ${event.note}`, queryText))
+    .sort(eventSort)
+    .slice(0, queryText ? 100 : 25)
+    .map(event => ({
+      type: "event", id: event.id, title: event.title, meta: eventSourceMeta(event), group: "other", categories: event.categories
+    }));
+
+  const filterAllows = group => sourcePickerFilter === "all" || sourcePickerFilter === group;
+  if (filterAllows("government")) appendSourceGroup("🏛️ งานราชการจากปฏิทิน", government);
+  if (filterAllows("freelance")) appendSourceGroup("💼 โปรเจกต์งานนอก", freelance);
+  if (filterAllows("other")) appendSourceGroup("📅 นัดหมายอื่น", other);
+
+  if (!sourcePickerList.children.length) {
+    const empty = document.createElement("div");
+    empty.className = "source-picker-empty";
+    empty.textContent = "ไม่พบรายการที่ตรงกับเงื่อนไข";
+    sourcePickerList.appendChild(empty);
+  }
+
+  updateSourceSelectedCount();
+}
+
+function updateSourceSelectedCount() {
+  $("source-selected-count").textContent = sourceSelection.size ? `เลือกแล้ว ${sourceSelection.size} รายการ` : "ยังไม่ได้เลือก";
+  $("add-selected-sources").disabled = sourceSelection.size === 0;
+}
+
+function openSourcePicker(date = planDate) {
+  planDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  sourceSelection.clear();
+  sourcePickerFilter = "all";
+  sourceSearch.value = "";
+  document.querySelectorAll(".source-filter").forEach(button => button.classList.toggle("active", button.dataset.sourceFilter === "all"));
+  $("source-picker-date").textContent = `จะเพิ่มลงแผน: ${planDate.toLocaleDateString("th-TH", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}`;
+  renderSourcePicker();
+  sourcePickerModal.classList.add("show");
+}
+
+async function addSelectedSourcesToPlan() {
+  if (!currentUser || !sourceSelection.size) return;
+  const date = formatDateKey(planDate);
+  const writes = [];
+
+  sourceSelection.forEach(key => {
+    const [type, id] = key.split(":");
+    if (sourceAlreadyInPlan(type, id)) return;
+
+    if (type === "event") {
+      const event = events.find(item => item.id === id);
+      if (!event) return;
+      const task = {
+        id: makeId("task"),
+        title: event.title,
+        categories: event.categories?.length ? event.categories : ["personal"],
+        priority: "normal",
+        completed: false,
+        date,
+        note: event.note ? `จากนัดหมาย • ${event.note}` : `จากนัดหมาย ${eventSourceMeta(event)}`,
+        sourceType: "event",
+        sourceId: event.id,
+        sourceLabel: `นัดหมาย • ${event.title}`
+      };
+      writes.push(setDoc(userDoc("tasks", task.id), firestoreTaskData(task), { merge: true }));
+      return;
+    }
+
+    if (type === "freelance") {
+      const project = freelanceProjects.find(item => item.id === id);
+      if (!project) return;
+      const task = {
+        id: makeId("task"),
+        title: project.name,
+        categories: ["freelance"],
+        priority: "normal",
+        completed: false,
+        date,
+        note: `งานนอก • ${project.clientName} • ${freelanceStatusInfo(project.status).name}`,
+        sourceType: "freelance",
+        sourceId: project.id,
+        sourceLabel: `งานนอก • ${project.clientName}`
+      };
+      writes.push(setDoc(userDoc("tasks", task.id), firestoreTaskData(task), { merge: true }));
+    }
+  });
+
+  if (!writes.length) {
+    sourcePickerModal.classList.remove("show");
+    return;
+  }
+
+  try {
+    setSyncState("กำลังเพิ่มงานลงแผน...", "busy");
+    $("add-selected-sources").disabled = true;
+    await Promise.all(writes);
+    sourceSelection.clear();
+    sourcePickerModal.classList.remove("show");
+    renderTaskPage();
+  } catch (error) {
+    console.error(error);
+    alert("เพิ่มงานลงแผนไม่สำเร็จ กรุณาลองใหม่");
+  } finally {
+    updateSourceSelectedCount();
+  }
+}
+
+function openTaskSource(task) {
+  if (!task?.sourceId) return;
+  taskDetailModal.classList.remove("show");
+  if (task.sourceType === "event") {
+    const event = events.find(item => item.id === String(task.sourceId));
+    if (event) openEventDetail(event.id);
+    else alert("ไม่พบข้อมูลนัดหมายต้นทาง อาจถูกลบไปแล้ว");
+    return;
+  }
+  if (task.sourceType === "freelance") {
+    const project = freelanceProjects.find(item => item.id === String(task.sourceId));
+    if (project) openFreelanceDetail(project.id);
+    else alert("ไม่พบโปรเจกต์ต้นทาง อาจถูกลบไปแล้ว");
+  }
+}
+
+// =========================================================
 // TASK FORM / DETAIL
 // =========================================================
 
@@ -1499,7 +1854,10 @@ async function saveTask() {
     date,
     priority,
     completed: existing ? existing.completed : false,
-    note: taskNote.value.trim()
+    note: taskNote.value.trim(),
+    sourceType: existing?.sourceType || "custom",
+    sourceId: existing?.sourceId || "",
+    sourceLabel: existing?.sourceLabel || ""
   };
 
   try {
@@ -1525,6 +1883,18 @@ function openTaskDetail(id) {
   $("detail-task-date").textContent = thaiDate(task.date);
   $("detail-task-priority").textContent = priorityName(task.priority);
   $("detail-task-note").textContent = task.note || "ไม่มีรายละเอียดเพิ่มเติม";
+
+  const sourceRow = $("detail-task-source-row");
+  const sourceButton = $("open-task-source");
+  if (task.sourceType && task.sourceType !== "custom" && task.sourceId) {
+    $("detail-task-source").textContent = task.sourceLabel || (task.sourceType === "event" ? "นัดหมาย" : "งานนอก");
+    sourceRow.classList.remove("hidden");
+    sourceButton.classList.remove("hidden");
+  } else {
+    sourceRow.classList.add("hidden");
+    sourceButton.classList.add("hidden");
+  }
+
   renderAttachmentGallery("task", task.id, "detail-task-images");
 
   const complete = $("complete-task");
@@ -1541,6 +1911,7 @@ const freelanceModal = $("freelance-modal");
 const freelanceDetailModal = $("freelance-detail-modal");
 const freelanceClient = $("freelance-client");
 const freelanceName = $("freelance-name");
+const freelanceUpdate = $("freelance-update");
 const freelanceTotalInput = $("freelance-total-input");
 const freelanceReceivedInput = $("freelance-received-input");
 const freelanceRemainingPreview = $("freelance-remaining-preview");
@@ -1560,6 +1931,7 @@ function openAddFreelance() {
   freelanceClient.value = "";
   freelanceName.value = "";
   setChecks("freelance-status", ["talking"]);
+  freelanceUpdate.value = "";
   freelanceTotalInput.value = "";
   freelanceReceivedInput.value = "";
   updateFreelancePreview();
@@ -1575,6 +1947,7 @@ function openEditFreelance(id) {
   freelanceClient.value = project.clientName === "ไม่ระบุผู้ว่าจ้าง" ? "" : project.clientName;
   freelanceName.value = project.name;
   setChecks("freelance-status", [project.status]);
+  freelanceUpdate.value = project.latestUpdate || "";
   freelanceTotalInput.value = String(project.totalAmount);
   freelanceReceivedInput.value = String(project.receivedAmount);
   updateFreelancePreview();
@@ -1588,6 +1961,7 @@ async function saveFreelance() {
   const clientName = normalizeClientName(freelanceClient.value);
   const name = freelanceName.value.trim();
   const status = getSingleCheck("freelance-status");
+  const latestUpdate = freelanceUpdate.value.trim();
   const totalAmount = Number(freelanceTotalInput.value);
   const receivedAmount = Number(freelanceReceivedInput.value);
 
@@ -1607,7 +1981,29 @@ async function saveFreelance() {
   }
 
   const id = editingFreelanceId || makeId("freelance");
-  const data = { id, clientName, name, status, totalAmount, receivedAmount };
+  const existingProject = editingFreelanceId
+    ? freelanceProjects.find(item => item.id === String(editingFreelanceId))
+    : null;
+
+  let latestUpdateAt = existingProject?.latestUpdateAt || "";
+  const previousUpdate = (existingProject?.latestUpdate || "").trim();
+
+  if (latestUpdate !== previousUpdate) {
+    latestUpdateAt = latestUpdate ? new Date().toISOString() : "";
+  } else if (!existingProject && latestUpdate) {
+    latestUpdateAt = new Date().toISOString();
+  }
+
+  const data = {
+    id,
+    clientName,
+    name,
+    status,
+    latestUpdate,
+    latestUpdateAt,
+    totalAmount,
+    receivedAmount
+  };
 
   try {
     setSyncState("กำลังบันทึกงานนอก...", "busy");
@@ -1632,6 +2028,9 @@ function openFreelanceDetail(id) {
   statusBadge.className = `freelance-status-badge ${project.status}`;
   statusBadge.textContent = `${statusInfo.icon} ${statusInfo.name}`;
   $("detail-freelance-name").textContent = project.name;
+  $("detail-freelance-update").textContent = project.latestUpdate || "ยังไม่มีการอัปเดต";
+  const updateDate = formatFreelanceUpdateDate(project.latestUpdateAt);
+  $("detail-freelance-update-date").textContent = updateDate ? `อัปเดตเมื่อ ${updateDate}` : "";
   $("detail-freelance-total").textContent = formatMoney(project.totalAmount);
   $("detail-freelance-received").textContent = formatMoney(project.receivedAmount);
   $("detail-freelance-remaining").textContent = formatMoney(remainingAmount(project));
@@ -1671,9 +2070,10 @@ nextMonth.addEventListener("click", () => {
 
 $("today-add-event").addEventListener("click", () => openAddEvent(new Date()));
 $("calendar-add-event").addEventListener("click", () => openAddEvent(selectedDate));
-$("today-add-task").addEventListener("click", () => openAddTask(new Date()));
-$("calendar-add-task").addEventListener("click", () => openAddTask(selectedDate));
-$("task-add-button").addEventListener("click", () => openAddTask(new Date()));
+$("today-add-task").addEventListener("click", () => openSourcePicker(new Date()));
+$("calendar-add-task").addEventListener("click", () => openSourcePicker(selectedDate));
+$("task-add-button").addEventListener("click", () => openAddTask(planDate));
+$("plan-pick-source").addEventListener("click", () => openSourcePicker(planDate));
 $("freelance-add-button").addEventListener("click", openAddFreelance);
 $("save-event").addEventListener("click", saveEvent);
 $("save-task").addEventListener("click", saveTask);
@@ -1768,13 +2168,42 @@ $("delete-freelance").addEventListener("click", async () => {
   }
 });
 
-document.querySelectorAll(".filter-btn").forEach(button => {
+$("plan-prev-day").addEventListener("click", () => {
+  planDate.setDate(planDate.getDate() - 1);
+  renderTaskPage();
+});
+
+$("plan-next-day").addEventListener("click", () => {
+  planDate.setDate(planDate.getDate() + 1);
+  renderTaskPage();
+});
+
+$("plan-go-today").addEventListener("click", () => {
+  const today = new Date();
+  planDate = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  renderTaskPage();
+});
+
+$("plan-date-input").addEventListener("change", event => {
+  if (!event.target.value) return;
+  planDate = dateFromKey(event.target.value);
+  renderTaskPage();
+});
+
+sourceSearch.addEventListener("input", renderSourcePicker);
+document.querySelectorAll(".source-filter").forEach(button => {
   button.addEventListener("click", () => {
-    taskFilter = button.dataset.filter;
-    document.querySelectorAll(".filter-btn").forEach(item => item.classList.remove("active"));
+    sourcePickerFilter = button.dataset.sourceFilter;
+    document.querySelectorAll(".source-filter").forEach(item => item.classList.remove("active"));
     button.classList.add("active");
-    renderTaskPage();
+    renderSourcePicker();
   });
+});
+$("add-selected-sources").addEventListener("click", addSelectedSourcesToPlan);
+$("close-source-picker").addEventListener("click", () => sourcePickerModal.classList.remove("show"));
+$("open-task-source").addEventListener("click", () => {
+  const task = tasks.find(item => item.id === String(selectedTaskId));
+  if (task) openTaskSource(task);
 });
 
 function closeModal(modal) {
@@ -1792,7 +2221,7 @@ function closeModal(modal) {
   button.addEventListener("click", () => closeModal(modal));
 });
 
-[eventModal, eventDetailModal, taskModal, taskDetailModal, freelanceModal, freelanceDetailModal].forEach(modal => {
+[eventModal, eventDetailModal, taskModal, taskDetailModal, freelanceModal, freelanceDetailModal, sourcePickerModal].forEach(modal => {
   modal.addEventListener("click", event => {
     if (event.target === modal) closeModal(modal);
   });

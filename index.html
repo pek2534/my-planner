@@ -82,7 +82,7 @@
     <section>
       <div class="section-title-row">
         <h2>งานวันนี้</h2>
-        <button id="today-add-task" class="small-add-btn" type="button">+ งาน</button>
+        <button id="today-add-task" class="small-add-btn" type="button">+ จัดงาน</button>
       </div>
       <div id="today-task-summary" class="progress-text"></div>
       <div id="today-task-list"></div>
@@ -123,7 +123,7 @@
     <section>
       <div class="section-title-row">
         <h2>งานของวันนี้</h2>
-        <button id="calendar-add-task" class="small-add-btn" type="button">+ งาน</button>
+        <button id="calendar-add-task" class="small-add-btn" type="button">+ จัดงาน</button>
       </div>
       <div id="calendar-task-list"></div>
     </section>
@@ -131,17 +131,47 @@
 
   <main id="tasks-page" class="page">
     <div class="section-title-row task-page-title">
-      <div><span class="section-label">TASKS</span><h2>รายการงาน</h2></div>
-      <button id="task-add-button" class="primary-btn" type="button">+ เพิ่มงาน</button>
+      <div>
+        <span class="section-label">DAILY PLAN</span>
+        <h2>แผนงานของฉัน</h2>
+      </div>
+      <span class="version-chip">v1.1</span>
     </div>
 
-    <div class="task-filters">
-      <button class="filter-btn active" data-filter="pending" type="button">ต้องทำ</button>
-      <button class="filter-btn" data-filter="today" type="button">วันนี้</button>
-      <button class="filter-btn" data-filter="all" type="button">ทั้งหมด</button>
-      <button class="filter-btn" data-filter="done" type="button">เสร็จแล้ว</button>
+    <section class="plan-date-card">
+      <button id="plan-prev-day" class="plan-date-arrow" type="button" aria-label="วันก่อนหน้า">‹</button>
+      <div class="plan-date-center">
+        <small>วันที่จะลงมือทำ</small>
+        <strong id="plan-date-title"></strong>
+        <input id="plan-date-input" type="date" aria-label="เลือกวันที่สำหรับแผนงาน">
+      </div>
+      <button id="plan-next-day" class="plan-date-arrow" type="button" aria-label="วันถัดไป">›</button>
+    </section>
+
+    <div class="plan-today-row">
+      <button id="plan-go-today" class="ghost-btn" type="button">วันนี้</button>
+      <span id="plan-task-summary" class="progress-text"></span>
     </div>
-    <div id="all-task-list"></div>
+
+    <div class="plan-actions">
+      <button id="plan-pick-source" class="primary-btn" type="button">＋ เลือกจากงานที่มี</button>
+      <button id="task-add-button" class="small-add-btn" type="button">＋ งานใหม่ / งานด่วน</button>
+    </div>
+
+    <section class="plan-list-section">
+      <div class="section-title-row">
+        <h2 id="plan-list-title">งานที่เลือกไว้</h2>
+      </div>
+      <div id="all-task-list"></div>
+    </section>
+
+    <section id="plan-overdue-section" class="plan-overdue-section hidden">
+      <div class="section-title-row">
+        <h2>งานค้างก่อนหน้านี้</h2>
+        <small id="plan-overdue-count"></small>
+      </div>
+      <div id="plan-overdue-list"></div>
+    </section>
   </main>
 
   <main id="freelance-page" class="page">
@@ -261,6 +291,38 @@
   </div>
 </div>
 
+<!-- DAILY PLAN SOURCE PICKER -->
+<div id="source-picker-modal" class="modal">
+  <div class="modal-box source-picker-box">
+    <div class="modal-header">
+      <div>
+        <span class="section-label">ADD TO PLAN</span>
+        <h2>เลือกสิ่งที่จะทำ</h2>
+      </div>
+      <button id="close-source-picker" class="close-btn" type="button">×</button>
+    </div>
+
+    <p id="source-picker-date" class="source-picker-date"></p>
+
+    <div class="source-picker-tools">
+      <input id="source-search" type="text" placeholder="ค้นหาชื่องาน / โปรเจกต์ / ผู้ว่าจ้าง">
+      <div class="source-filter-row">
+        <button class="source-filter active" data-source-filter="all" type="button">ทั้งหมด</button>
+        <button class="source-filter" data-source-filter="government" type="button">🏛️ งานราชการ</button>
+        <button class="source-filter" data-source-filter="freelance" type="button">💼 งานนอก</button>
+        <button class="source-filter" data-source-filter="other" type="button">📅 นัดอื่น</button>
+      </div>
+    </div>
+
+    <div id="source-picker-list" class="source-picker-list"></div>
+
+    <div class="source-picker-footer">
+      <span id="source-selected-count">ยังไม่ได้เลือก</span>
+      <button id="add-selected-sources" class="save-btn source-add-selected" type="button">เพิ่มลงแผน</button>
+    </div>
+  </div>
+</div>
+
 <!-- TASK FORM -->
 <div id="task-modal" class="modal">
   <div class="modal-box">
@@ -282,7 +344,7 @@
       <label class="check-row"><input type="checkbox" value="finance"><span class="box">✓</span><span>💰 การเงิน</span></label>
     </div>
 
-    <label>กำหนดเสร็จ</label>
+    <label>วันที่จะทำ</label>
     <input id="task-date" type="date">
 
     <label>ความสำคัญ <small class="hint">เลือก 1 ช่อง</small></label>
@@ -316,6 +378,8 @@
     <h2 id="detail-task-title"></h2>
     <div class="detail-line">📅 <span id="detail-task-date"></span></div>
     <div class="detail-line">⚑ <span id="detail-task-priority"></span></div>
+    <div id="detail-task-source-row" class="detail-line source-detail-row hidden">🔗 <span id="detail-task-source"></span></div>
+    <button id="open-task-source" class="source-open-btn hidden" type="button">เปิดข้อมูลต้นทาง</button>
     <div class="detail-note"><strong>รายละเอียด</strong><p id="detail-task-note"></p></div>
     <div class="detail-photo-section">
       <strong>รูปประกอบ</strong>
@@ -350,6 +414,10 @@
       <label class="check-row"><input type="checkbox" value="paid"><span class="box">✓</span><span>✅ เบิกเงินแล้วเสร็จ</span></label>
     </div>
 
+    <label>อัปเดตล่าสุด <small class="hint">เช่น ส่งแบบแล้ว รอลูกค้าตรวจ</small></label>
+    <textarea id="freelance-update" rows="3" placeholder="พิมพ์สั้น ๆ ว่าตอนนี้งานค้างอยู่ขั้นตอนไหน"></textarea>
+    <p class="auto-update-hint">วันที่อัปเดตจะบันทึกให้อัตโนมัติเมื่อข้อความนี้เปลี่ยน</p>
+
     <label>เงินทั้งหมด</label>
     <input id="freelance-total-input" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0">
 
@@ -377,6 +445,13 @@
     <div id="detail-freelance-client" class="client-detail-name"></div>
     <div id="detail-freelance-status" class="freelance-status-badge"></div>
     <h2 id="detail-freelance-name"></h2>
+
+    <div class="freelance-update-detail">
+      <small>อัปเดตล่าสุด</small>
+      <p id="detail-freelance-update">ยังไม่มีการอัปเดต</p>
+      <span id="detail-freelance-update-date"></span>
+    </div>
+
     <div class="money-detail"><span>เงินทั้งหมด</span><strong id="detail-freelance-total"></strong></div>
     <div class="money-detail"><span>รับมาแล้ว</span><strong id="detail-freelance-received"></strong></div>
     <div class="money-detail outstanding"><span>เหลือค้างเบิก</span><strong id="detail-freelance-remaining"></strong></div>

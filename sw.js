@@ -1,4 +1,4 @@
-const CACHE_NAME = "my-planner-v09";
+const CACHE_NAME = "my-planner-v1-1";
 const APP_FILES = ["./", "./index.html", "./style.css", "./script.js", "./manifest.json", "./icon.svg"];
 
 self.addEventListener("install", event => {
