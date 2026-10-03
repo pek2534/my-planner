@@ -135,7 +135,7 @@
         <span class="section-label">DAILY PLAN</span>
         <h2>แผนงานของฉัน</h2>
       </div>
-      <span class="version-chip">v1.1</span>
+      <span class="version-chip">v1.2</span>
     </div>
 
     <section class="plan-date-card">
@@ -234,8 +234,25 @@
       <label class="check-row"><input type="checkbox" value="finance"><span class="box">✓</span><span>💰 การเงิน</span></label>
     </div>
 
-    <label>วันที่</label>
+    <label>รูปแบบนัด</label>
+    <div class="event-date-mode" role="radiogroup" aria-label="รูปแบบวันที่นัดหมาย">
+      <label class="event-date-mode-option">
+        <input type="radio" name="event-date-mode" value="single" checked>
+        <span>วันเดียว</span>
+      </label>
+      <label class="event-date-mode-option">
+        <input type="radio" name="event-date-mode" value="range">
+        <span>หลายวัน</span>
+      </label>
+    </div>
+
+    <label id="event-start-date-label">วันที่</label>
     <input id="event-date" type="date">
+
+    <div id="event-end-date-block" class="event-end-date-block hidden">
+      <label>ถึงวันที่</label>
+      <input id="event-end-date" type="date">
+    </div>
 
     <label>เวลาเริ่ม</label>
     <input id="event-start-time" type="time">

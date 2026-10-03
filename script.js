@@ -119,21 +119,30 @@ let freelanceProjects = normalizeFreelance(JSON.parse(localStorage.getItem("plan
 
 function normalizeEvents(list) {
   if (!Array.isArray(list)) return [];
-  return list.map(event => ({
-    ...event,
-    id: String(event.id ?? makeId("event")),
-    title: event.title || "ไม่มีชื่อ",
-    categories: Array.isArray(event.categories)
-      ? event.categories
-      : (event.category ? [event.category] : ["personal"]),
-    reminders: Array.isArray(event.reminders)
-      ? event.reminders.map(Number).filter(Number.isFinite)
-      : [],
-    date: event.date || formatDateKey(new Date()),
-    startTime: event.startTime || "09:00",
-    location: event.location || "",
-    note: event.note || ""
-  }));
+  return list.map(event => {
+    const date = event.date || formatDateKey(new Date());
+    const rawEndDate = event.endDate || date;
+    const endDate = rawEndDate >= date ? rawEndDate : date;
+    const dateMode = event.dateMode === "range" || endDate !== date ? "range" : "single";
+
+    return {
+      ...event,
+      id: String(event.id ?? makeId("event")),
+      title: event.title || "ไม่มีชื่อ",
+      categories: Array.isArray(event.categories)
+        ? event.categories
+        : (event.category ? [event.category] : ["personal"]),
+      reminders: Array.isArray(event.reminders)
+        ? event.reminders.map(Number).filter(Number.isFinite)
+        : [],
+      date,
+      endDate,
+      dateMode,
+      startTime: event.startTime || "09:00",
+      location: event.location || "",
+      note: event.note || ""
+    };
+  });
 }
 
 function normalizeTasks(list) {
@@ -228,6 +237,28 @@ function thaiDate(key) {
   });
 }
 
+function eventEndDate(event) {
+  const start = event?.date || formatDateKey(new Date());
+  const end = event?.endDate || start;
+  return end >= start ? end : start;
+}
+
+function eventOccursOnDate(event, dateKey) {
+  if (!event?.date || !dateKey) return false;
+  return dateKey >= event.date && dateKey <= eventEndDate(event);
+}
+
+function eventDateDisplay(event, includeWeekday = true) {
+  if (!event?.date) return "";
+  const endDate = eventEndDate(event);
+  if (endDate === event.date) return includeWeekday ? thaiDate(event.date) : thaiShortDate(event.date);
+
+  if (includeWeekday) {
+    return `${thaiDate(event.date)} ถึง ${thaiDate(endDate)}`;
+  }
+  return `${thaiShortDate(event.date)} – ${thaiShortDate(endDate)}`;
+}
+
 function categoryInfo(key) {
   return categories[key] || categories.personal;
 }
@@ -303,11 +334,14 @@ function userDoc(name, id) {
 }
 
 function firestoreEventData(event) {
+  const endDate = eventEndDate(event);
   return {
     title: event.title,
     categories: event.categories,
     reminders: event.reminders,
     date: event.date,
+    endDate,
+    dateMode: event.dateMode === "range" || endDate !== event.date ? "range" : "single",
     startTime: event.startTime,
     location: event.location || "",
     note: event.note || "",
@@ -679,7 +713,7 @@ function renderToday() {
 
   todayEventList.innerHTML = "";
   const dayEvents = events
-    .filter(event => event.date === key)
+    .filter(event => eventOccursOnDate(event, key))
     .sort((a, b) => a.startTime.localeCompare(b.startTime));
 
   if (!dayEvents.length) {
@@ -725,7 +759,7 @@ function renderNextEvent() {
   title.textContent = event.title;
 
   const detail = document.createElement("small");
-  detail.textContent = `${thaiDate(event.date)} • ${event.startTime}`;
+  detail.textContent = `${eventDateDisplay(event, false)} • ${event.startTime}`;
 
   card.append(title, detail);
   card.addEventListener("click", () => openEventDetail(event.id));
@@ -784,7 +818,7 @@ function renderCalendar() {
 
     const dayCategories = [...new Set(
       events
-        .filter(event => event.date === key)
+        .filter(event => eventOccursOnDate(event, key))
         .flatMap(event => event.categories)
     )].slice(0, 3);
 
@@ -822,7 +856,7 @@ function renderSelectedDate() {
 
   eventList.innerHTML = "";
   const selectedEvents = events
-    .filter(event => event.date === key)
+    .filter(event => eventOccursOnDate(event, key))
     .sort((a, b) => a.startTime.localeCompare(b.startTime));
 
   if (!selectedEvents.length) {
@@ -1146,8 +1180,9 @@ function exportGovernmentAppointmentsToExcel() {
 
   const rows = governmentEvents.map((event, index) => ({
     "ลำดับ": index + 1,
-    "วันที่ (เรียงข้อมูล)": event.date,
-    "วันที่แบบไทย": thaiShortDate(event.date),
+    "วันที่เริ่ม": event.date,
+    "วันที่สิ้นสุด": eventEndDate(event),
+    "ช่วงวันที่แบบไทย": eventDateDisplay(event, false),
     "เวลา": event.startTime || "",
     "เรื่อง / นัดหมาย": event.title || "",
     "สถานที่": event.location || "",
@@ -1160,7 +1195,8 @@ function exportGovernmentAppointmentsToExcel() {
   worksheet["!cols"] = [
     { wch: 8 },
     { wch: 16 },
-    { wch: 20 },
+    { wch: 16 },
+    { wch: 28 },
     { wch: 10 },
     { wch: 34 },
     { wch: 28 },
@@ -1168,7 +1204,7 @@ function exportGovernmentAppointmentsToExcel() {
     { wch: 24 },
     { wch: 28 }
   ];
-  worksheet["!autofilter"] = { ref: `A1:I${rows.length + 1}` };
+  worksheet["!autofilter"] = { ref: `A1:J${rows.length + 1}` };
 
   const workbook = window.XLSX.utils.book_new();
   window.XLSX.utils.book_append_sheet(workbook, worksheet, "งานราชการ");
@@ -1456,9 +1492,32 @@ const eventModal = $("event-modal");
 const eventDetailModal = $("event-detail-modal");
 const eventTitle = $("event-title");
 const eventDate = $("event-date");
+const eventEndDateInput = $("event-end-date");
+const eventEndDateBlock = $("event-end-date-block");
+const eventStartDateLabel = $("event-start-date-label");
+const eventDateModeInputs = [...document.querySelectorAll('input[name="event-date-mode"]')];
 const eventStart = $("event-start-time");
 const eventLocation = $("event-location");
 const eventNote = $("event-note");
+
+function getEventDateMode() {
+  return eventDateModeInputs.find(input => input.checked)?.value || "single";
+}
+
+function setEventDateMode(mode = "single") {
+  const nextMode = mode === "range" ? "range" : "single";
+  eventDateModeInputs.forEach(input => {
+    input.checked = input.value === nextMode;
+  });
+  eventEndDateBlock.classList.toggle("hidden", nextMode !== "range");
+  eventStartDateLabel.textContent = nextMode === "range" ? "วันที่เริ่ม" : "วันที่";
+
+  if (nextMode === "single") {
+    eventEndDateInput.value = eventDate.value;
+  } else if (!eventEndDateInput.value) {
+    eventEndDateInput.value = eventDate.value;
+  }
+}
 
 function openAddEvent(date = selectedDate) {
   editingEventId = null;
@@ -1467,6 +1526,8 @@ function openAddEvent(date = selectedDate) {
   setChecks("event-categories", ["personal"]);
   setChecks("event-reminders", []);
   eventDate.value = formatDateKey(date);
+  eventEndDateInput.value = eventDate.value;
+  setEventDateMode("single");
   eventStart.value = "09:00";
   eventLocation.value = "";
   eventNote.value = "";
@@ -1484,6 +1545,8 @@ function openEditEvent(id) {
   setChecks("event-categories", event.categories);
   setChecks("event-reminders", event.reminders.map(String));
   eventDate.value = event.date;
+  eventEndDateInput.value = eventEndDate(event);
+  setEventDateMode(event.dateMode === "range" || eventEndDate(event) !== event.date ? "range" : "single");
   eventStart.value = event.startTime;
   eventLocation.value = event.location;
   eventNote.value = event.note;
@@ -1499,10 +1562,17 @@ async function saveEvent() {
   const eventCategories = getChecks("event-categories");
   const reminders = getChecks("event-reminders").map(Number);
   const date = eventDate.value;
+  const dateMode = getEventDateMode();
+  const endDate = dateMode === "range" ? eventEndDateInput.value : date;
   const startTime = eventStart.value;
 
-  if (!title || !eventCategories.length || !date || !startTime) {
+  if (!title || !eventCategories.length || !date || !startTime || (dateMode === "range" && !endDate)) {
     alert("กรุณากรอกชื่อ เลือกประเภท วันที่ และเวลาเริ่มให้ครบ");
+    return;
+  }
+
+  if (dateMode === "range" && endDate < date) {
+    alert("วันที่สิ้นสุดต้องไม่ก่อนวันที่เริ่ม");
     return;
   }
 
@@ -1513,6 +1583,8 @@ async function saveEvent() {
     categories: eventCategories,
     reminders,
     date,
+    endDate,
+    dateMode,
     startTime,
     location: eventLocation.value.trim(),
     note: eventNote.value.trim()
@@ -1551,7 +1623,7 @@ function openEventDetail(id) {
   selectedEventId = event.id;
   createCategoryBadges(event.categories, $("detail-event-categories"));
   $("detail-event-title").textContent = event.title;
-  $("detail-event-date").textContent = thaiDate(event.date);
+  $("detail-event-date").textContent = eventDateDisplay(event);
   $("detail-event-time").textContent = event.startTime;
   $("detail-event-location").textContent = event.location || "ไม่ได้ระบุสถานที่";
   $("detail-event-reminders").textContent = reminderText(event.reminders);
@@ -1578,7 +1650,7 @@ function sourceAlreadyInPlan(type, id) {
 }
 
 function eventSourceMeta(event) {
-  return `${dateFromKey(event.date).toLocaleDateString("th-TH", { day: "numeric", month: "short", year: "numeric" })} • ${event.startTime}${event.location ? ` • ${event.location}` : ""}`;
+  return `${eventDateDisplay(event, false)} • ${event.startTime}${event.location ? ` • ${event.location}` : ""}`;
 }
 
 function sourceMatchesSearch(text, queryText) {
@@ -2075,6 +2147,18 @@ $("calendar-add-task").addEventListener("click", () => openSourcePicker(selected
 $("task-add-button").addEventListener("click", () => openAddTask(planDate));
 $("plan-pick-source").addEventListener("click", () => openSourcePicker(planDate));
 $("freelance-add-button").addEventListener("click", openAddFreelance);
+
+eventDateModeInputs.forEach(input => {
+  input.addEventListener("change", () => setEventDateMode(input.value));
+});
+eventDate.addEventListener("change", () => {
+  if (getEventDateMode() === "single") {
+    eventEndDateInput.value = eventDate.value;
+  } else if (!eventEndDateInput.value || eventEndDateInput.value < eventDate.value) {
+    eventEndDateInput.value = eventDate.value;
+  }
+});
+
 $("save-event").addEventListener("click", saveEvent);
 $("save-task").addEventListener("click", saveTask);
 $("save-freelance").addEventListener("click", saveFreelance);
@@ -2362,7 +2446,12 @@ function exportEventICS(event) {
     alarms += `BEGIN:VALARM\r\nTRIGGER:-PT${minutes}M\r\nACTION:DISPLAY\r\nDESCRIPTION:${escapeICS(event.title)}\r\nEND:VALARM\r\n`;
   });
 
-  const ics = `BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//My Planner//TH\r\nCALSCALE:GREGORIAN\r\nBEGIN:VEVENT\r\nUID:${event.id}@my-planner\r\nDTSTAMP:${new Date().toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z/, "Z")}\r\nDTSTART:${icsLocalDate(event.date, event.startTime)}\r\nSUMMARY:${escapeICS(event.title)}\r\nLOCATION:${escapeICS(event.location)}\r\nDESCRIPTION:${escapeICS(event.note)}\r\n${alarms}END:VEVENT\r\nEND:VCALENDAR\r\n`;
+  const endDate = eventEndDate(event);
+  const dtEndLine = endDate !== event.date
+    ? `DTEND:${icsLocalDate(endDate, "23:59")}\r\n`
+    : "";
+
+  const ics = `BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//My Planner//TH\r\nCALSCALE:GREGORIAN\r\nBEGIN:VEVENT\r\nUID:${event.id}@my-planner\r\nDTSTAMP:${new Date().toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z/, "Z")}\r\nDTSTART:${icsLocalDate(event.date, event.startTime)}\r\n${dtEndLine}SUMMARY:${escapeICS(event.title)}\r\nLOCATION:${escapeICS(event.location)}\r\nDESCRIPTION:${escapeICS(event.note)}\r\n${alarms}END:VEVENT\r\nEND:VCALENDAR\r\n`;
 
   const blob = new Blob([ics], { type: "text/calendar;charset=utf-8" });
   const url = URL.createObjectURL(blob);

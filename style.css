@@ -456,3 +456,10 @@ EXCEL EXPORT
   color:#929cad;
   font-size:11px;
 }
+
+/* v1.2 optional multi-day appointments */
+.event-date-mode{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
+.event-date-mode-option{display:flex;align-items:center;justify-content:center;gap:8px;min-height:46px;margin:0;padding:10px 12px;border:1px solid #e1e7f0;border-radius:12px;background:#fbfcfe;cursor:pointer;font-weight:700}
+.event-date-mode-option:has(input:checked){border-color:#2878ff;background:#f3f7ff;color:#2878ff}
+.event-date-mode-option input{margin:0;accent-color:#2878ff}
+.event-end-date-block.hidden{display:none}
