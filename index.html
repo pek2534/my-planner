@@ -1,268 +1,249 @@
 <!DOCTYPE html>
 <html lang="th">
-
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#2878ff">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="My Planner">
   <title>My Planner</title>
-
+  <link rel="manifest" href="manifest.json">
   <link rel="stylesheet" href="style.css">
 </head>
-
-
 <body>
+<div class="app">
+  <header class="top-bar">
+    <div>
+      <h1>My Planner</h1>
+      <p id="today-text"></p>
+    </div>
+    <div class="clock">
+      <div id="time-text">--:--:--</div>
+      <small>เวลาปัจจุบัน</small>
+    </div>
+  </header>
 
-  <div class="app">
-
-    <!-- HEADER -->
-
-    <div class="top-bar">
-
+  <main id="today-page" class="page active">
+    <section class="hero-card">
       <div>
-        <h1>My Planner</h1>
-        <p id="today-text"></p>
+        <span class="section-label">TODAY</span>
+        <h2 id="today-heading">วันนี้</h2>
       </div>
+      <div id="today-day-number" class="today-date-big"></div>
+    </section>
 
-      <div class="clock">
-        <div id="time-text">--:--</div>
-        <small>เวลาปัจจุบัน</small>
+    <section class="notification-panel">
+      <div>
+        <strong>🔔 การแจ้งเตือน</strong>
+        <p id="notification-status">ยังไม่ได้เปิดการแจ้งเตือน</p>
       </div>
+      <div class="notification-actions">
+        <button id="enable-notifications" class="small-add-btn">เปิดแจ้งเตือน</button>
+        <button id="test-notification" class="ghost-btn">ทดสอบ</button>
+      </div>
+    </section>
 
-    </div>
+    <section>
+      <div class="section-title-row">
+        <h2>นัดหมายวันนี้</h2>
+        <button id="today-add-event" class="small-add-btn">+ นัด</button>
+      </div>
+      <div id="today-event-list"></div>
+    </section>
 
+    <section>
+      <div class="section-title-row">
+        <h2>งานวันนี้</h2>
+        <button id="today-add-task" class="small-add-btn">+ งาน</button>
+      </div>
+      <div id="today-task-summary" class="progress-text"></div>
+      <div id="today-task-list"></div>
+    </section>
 
-    <!-- CALENDAR -->
+    <section>
+      <div class="section-title-row"><h2>นัดหมายถัดไป</h2></div>
+      <div id="next-event"></div>
+    </section>
+  </main>
 
-    <div class="calendar-card">
-
+  <main id="calendar-page" class="page">
+    <section class="calendar-card">
       <div class="calendar-header">
-
         <button id="prev-month">‹</button>
-
         <h2 id="month-title"></h2>
-
         <button id="next-month">›</button>
-
       </div>
+      <div id="calendar" class="calendar"></div>
+    </section>
 
-      <div
-        class="calendar"
-        id="calendar">
+    <section>
+      <div class="section-title-row">
+        <h2 id="appointment-title">นัดหมาย</h2>
+        <button id="calendar-add-event" class="small-add-btn">+ นัด</button>
       </div>
+      <div id="event-list"></div>
+    </section>
 
+    <section>
+      <div class="section-title-row">
+        <h2>งานของวันนี้</h2>
+        <button id="calendar-add-task" class="small-add-btn">+ งาน</button>
+      </div>
+      <div id="calendar-task-list"></div>
+    </section>
+  </main>
+
+  <main id="tasks-page" class="page">
+    <div class="section-title-row task-page-title">
+      <div><span class="section-label">TASKS</span><h2>รายการงาน</h2></div>
+      <button id="task-add-button" class="primary-btn">+ เพิ่มงาน</button>
     </div>
 
+    <div class="task-filters">
+      <button class="filter-btn active" data-filter="pending">ต้องทำ</button>
+      <button class="filter-btn" data-filter="today">วันนี้</button>
+      <button class="filter-btn" data-filter="all">ทั้งหมด</button>
+      <button class="filter-btn" data-filter="done">เสร็จแล้ว</button>
+    </div>
+    <div id="all-task-list"></div>
+  </main>
 
-    <!-- EVENTS -->
+  <nav class="bottom-nav">
+    <button class="nav-btn active" data-page="today-page"><span>⌂</span>วันนี้</button>
+    <button class="nav-btn" data-page="calendar-page"><span>▣</span>ปฏิทิน</button>
+    <button class="nav-btn" data-page="tasks-page"><span>✓</span>งาน</button>
+  </nav>
+</div>
 
-    <div class="event-header">
-
-      <h2 id="appointment-title">
-        นัดหมาย
-      </h2>
-
+<!-- EVENT FORM -->
+<div id="event-modal" class="modal">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h2 id="event-form-title">เพิ่มนัดหมาย</h2>
+      <button id="close-event-form" class="close-btn">×</button>
     </div>
 
-    <div id="event-list"></div>
+    <label>ชื่อนัดหมาย</label>
+    <input id="event-title" type="text" placeholder="เช่น ตรวจอาคาร / ประชุม">
 
+    <label>ประเภท <small class="hint">เลือกได้มากกว่า 1</small></label>
+    <div class="check-list" data-group="event-categories">
+      <label class="check-row"><input type="checkbox" value="government"><span class="box">✓</span><span>🏛️ งานราชการ</span></label>
+      <label class="check-row"><input type="checkbox" value="freelance"><span class="box">✓</span><span>💼 งานออกแบบ</span></label>
+      <label class="check-row"><input type="checkbox" value="personal"><span class="box">✓</span><span>👤 ส่วนตัว</span></label>
+      <label class="check-row"><input type="checkbox" value="fitness"><span class="box">✓</span><span>🏋️ ออกกำลังกาย</span></label>
+      <label class="check-row"><input type="checkbox" value="study"><span class="box">✓</span><span>📚 เรียน / พัฒนา</span></label>
+      <label class="check-row"><input type="checkbox" value="finance"><span class="box">✓</span><span>💰 การเงิน</span></label>
+    </div>
 
-    <!-- ADD BUTTON -->
+    <label>วันที่</label>
+    <input id="event-date" type="date">
 
-    <button
-      class="add-btn"
-      id="add-btn">
-      +
-    </button>
+    <div class="time-row">
+      <div><label>เวลาเริ่ม</label><input id="event-start-time" type="time"></div>
+      <div><label>เวลาสิ้นสุด</label><input id="event-end-time" type="time"></div>
+    </div>
 
+    <label>สถานที่</label>
+    <input id="event-location" type="text" placeholder="เช่น สำนักงาน / โครงการ">
+
+    <label>แจ้งเตือน <small class="hint">เลือกได้หลายช่วง</small></label>
+    <div class="check-list compact" data-group="event-reminders">
+      <label class="check-row"><input type="checkbox" value="5"><span class="box">✓</span><span>ก่อน 5 นาที</span></label>
+      <label class="check-row"><input type="checkbox" value="15"><span class="box">✓</span><span>ก่อน 15 นาที</span></label>
+      <label class="check-row"><input type="checkbox" value="30"><span class="box">✓</span><span>ก่อน 30 นาที</span></label>
+      <label class="check-row"><input type="checkbox" value="60"><span class="box">✓</span><span>ก่อน 1 ชั่วโมง</span></label>
+      <label class="check-row"><input type="checkbox" value="1440"><span class="box">✓</span><span>ก่อน 1 วัน</span></label>
+    </div>
+
+    <label>รายละเอียด</label>
+    <textarea id="event-note" rows="4" placeholder="รายละเอียดเพิ่มเติม"></textarea>
+
+    <button id="save-event" class="save-btn">บันทึกนัดหมาย</button>
   </div>
+</div>
 
+<!-- EVENT DETAIL -->
+<div id="event-detail-modal" class="modal">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h2>รายละเอียดนัดหมาย</h2>
+      <button id="close-event-detail" class="close-btn">×</button>
+    </div>
+    <div id="detail-event-categories" class="badge-wrap"></div>
+    <h2 id="detail-event-title"></h2>
+    <div class="detail-line">📅 <span id="detail-event-date"></span></div>
+    <div class="detail-line">🕐 <span id="detail-event-time"></span></div>
+    <div class="detail-line">📍 <span id="detail-event-location"></span></div>
+    <div class="detail-line">🔔 <span id="detail-event-reminders"></span></div>
+    <div class="detail-note"><strong>รายละเอียด</strong><p id="detail-event-note"></p></div>
+    <button id="export-calendar" class="calendar-export-btn">📅 เพิ่มลง Calendar (.ics)</button>
+    <div class="detail-actions">
+      <button id="edit-event" class="edit-btn">แก้ไข</button>
+      <button id="delete-event" class="delete-btn">ลบนัดหมาย</button>
+    </div>
+  </div>
+</div>
 
-
-  <!-- ========================== -->
-  <!-- เพิ่ม / แก้ไข นัดหมาย -->
-  <!-- ========================== -->
-
-  <div
-    class="modal"
-    id="event-modal">
-
-    <div class="modal-box">
-
-      <div class="modal-header">
-
-        <h2 id="form-title">
-          เพิ่มนัดหมาย
-        </h2>
-
-        <button
-          class="close-btn"
-          id="close-form">
-          ×
-        </button>
-
-      </div>
-
-
-      <label>
-        ชื่อนัดหมาย
-      </label>
-
-      <input
-        id="event-title"
-        type="text"
-        placeholder="เช่น ตรวจอาคาร">
-
-
-      <label>
-        วันที่
-      </label>
-
-      <input
-        id="event-date"
-        type="date">
-
-
-      <div class="time-row">
-
-        <div>
-
-          <label>
-            เวลาเริ่ม
-          </label>
-
-          <input
-            id="start-time"
-            type="time">
-
-        </div>
-
-
-        <div>
-
-          <label>
-            เวลาสิ้นสุด
-          </label>
-
-          <input
-            id="end-time"
-            type="time">
-
-        </div>
-
-      </div>
-
-
-      <label>
-        สถานที่
-      </label>
-
-      <input
-        id="event-location"
-        type="text"
-        placeholder="เช่น สำนักงานเขต">
-
-
-      <label>
-        รายละเอียด
-      </label>
-
-      <textarea
-        id="event-note"
-        rows="4"
-        placeholder="รายละเอียดเพิ่มเติม...">
-      </textarea>
-
-
-      <button
-        class="save-btn"
-        id="save-event">
-        บันทึกนัดหมาย
-      </button>
-
+<!-- TASK FORM -->
+<div id="task-modal" class="modal">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h2 id="task-form-title">เพิ่มงาน</h2>
+      <button id="close-task-form" class="close-btn">×</button>
     </div>
 
-  </div>
+    <label>ชื่องาน</label>
+    <input id="task-title" type="text" placeholder="เช่น ทำรายงาน / ตรวจแบบ">
 
-
-
-  <!-- ========================== -->
-  <!-- ดูรายละเอียด -->
-  <!-- ========================== -->
-
-  <div
-    class="modal"
-    id="detail-modal">
-
-    <div class="modal-box">
-
-      <div class="modal-header">
-
-        <h2>
-          รายละเอียดนัดหมาย
-        </h2>
-
-        <button
-          class="close-btn"
-          id="close-detail">
-          ×
-        </button>
-
-      </div>
-
-
-      <h2 id="detail-title"></h2>
-
-      <div class="detail-line">
-        📅
-        <span id="detail-date"></span>
-      </div>
-
-      <div class="detail-line">
-        🕐
-        <span id="detail-time"></span>
-      </div>
-
-      <div class="detail-line">
-        📍
-        <span id="detail-location"></span>
-      </div>
-
-
-      <div class="detail-note">
-
-        <strong>
-          รายละเอียด
-        </strong>
-
-        <p id="detail-note"></p>
-
-      </div>
-
-
-      <div class="detail-actions">
-
-        <button
-          class="edit-btn"
-          id="edit-event">
-          แก้ไข
-        </button>
-
-        <button
-          class="delete-btn"
-          id="delete-event">
-          ลบนัดหมาย
-        </button>
-
-      </div>
-
+    <label>ประเภท <small class="hint">เลือกได้มากกว่า 1</small></label>
+    <div class="check-list" data-group="task-categories">
+      <label class="check-row"><input type="checkbox" value="government"><span class="box">✓</span><span>🏛️ งานราชการ</span></label>
+      <label class="check-row"><input type="checkbox" value="freelance"><span class="box">✓</span><span>💼 งานออกแบบ</span></label>
+      <label class="check-row"><input type="checkbox" value="personal"><span class="box">✓</span><span>👤 ส่วนตัว</span></label>
+      <label class="check-row"><input type="checkbox" value="fitness"><span class="box">✓</span><span>🏋️ ออกกำลังกาย</span></label>
+      <label class="check-row"><input type="checkbox" value="study"><span class="box">✓</span><span>📚 เรียน / พัฒนา</span></label>
+      <label class="check-row"><input type="checkbox" value="finance"><span class="box">✓</span><span>💰 การเงิน</span></label>
     </div>
 
+    <label>กำหนดเสร็จ</label>
+    <input id="task-date" type="date">
+
+    <label>ความสำคัญ <small class="hint">เลือก 1 ช่อง</small></label>
+    <div class="check-list compact single-check" data-group="task-priority">
+      <label class="check-row"><input type="checkbox" value="normal"><span class="box">✓</span><span>ปกติ</span></label>
+      <label class="check-row"><input type="checkbox" value="high"><span class="box">✓</span><span>⚠️ สำคัญ</span></label>
+      <label class="check-row"><input type="checkbox" value="urgent"><span class="box">✓</span><span>🚨 ด่วน</span></label>
+    </div>
+
+    <label>รายละเอียด</label>
+    <textarea id="task-note" rows="4" placeholder="รายละเอียดเพิ่มเติม"></textarea>
+
+    <button id="save-task" class="save-btn">บันทึกงาน</button>
   </div>
+</div>
 
+<!-- TASK DETAIL -->
+<div id="task-detail-modal" class="modal">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h2>รายละเอียดงาน</h2>
+      <button id="close-task-detail" class="close-btn">×</button>
+    </div>
+    <div id="detail-task-categories" class="badge-wrap"></div>
+    <h2 id="detail-task-title"></h2>
+    <div class="detail-line">📅 <span id="detail-task-date"></span></div>
+    <div class="detail-line">⚑ <span id="detail-task-priority"></span></div>
+    <div class="detail-note"><strong>รายละเอียด</strong><p id="detail-task-note"></p></div>
+    <button id="complete-task" class="complete-btn">✓ ทำเสร็จแล้ว</button>
+    <div class="detail-actions">
+      <button id="edit-task" class="edit-btn">แก้ไข</button>
+      <button id="delete-task" class="delete-btn">ลบงาน</button>
+    </div>
+  </div>
+</div>
 
-  <script src="script.js"></script>
-
+<script src="script.js"></script>
 </body>
-
 </html>
