@@ -95,6 +95,14 @@
   </main>
 
   <main id="calendar-page" class="page">
+    <section class="excel-export-panel">
+      <div>
+        <strong>🏛️ รายงานงานราชการ</strong>
+        <p>ส่งออกนัดหมายที่ติ๊ก “งานราชการ” ทั้งหมด พร้อมรายละเอียด/บันทึก เป็นไฟล์ Excel</p>
+      </div>
+      <button id="export-government-excel" class="primary-btn" type="button">⬇ Excel</button>
+    </section>
+
     <section class="calendar-card">
       <div class="calendar-header">
         <button id="prev-month" type="button">‹</button>
@@ -214,8 +222,14 @@
       <label class="check-row"><input type="checkbox" value="1440"><span class="box">✓</span><span>ก่อน 1 วัน</span></label>
     </div>
 
-    <label>รายละเอียด</label>
-    <textarea id="event-note" rows="4" placeholder="รายละเอียดเพิ่มเติม"></textarea>
+    <label>รายละเอียด / บันทึก</label>
+    <textarea id="event-note" rows="5" placeholder="บันทึกรายละเอียดงาน เช่น เรื่องที่ตรวจ ผลการดำเนินการ ผู้ติดต่อ หรือข้อมูลที่ต้องจำ"></textarea>
+
+    <label>รูปประกอบ <small class="hint">เลือกจากคลังภาพได้ • สูงสุด 6 รูป</small></label>
+    <input id="event-photo-input" class="hidden-file-input" type="file" accept="image/*" multiple>
+    <button id="event-photo-button" class="photo-add-btn" type="button">＋ เพิ่มรูปจากคลังภาพ</button>
+    <p id="event-photo-status" class="photo-status"></p>
+    <div id="event-photo-preview" class="photo-preview-grid"></div>
 
     <button id="save-event" class="save-btn" type="button">บันทึกนัดหมาย</button>
   </div>
@@ -234,7 +248,11 @@
     <div class="detail-line">🕐 <span id="detail-event-time"></span></div>
     <div class="detail-line">📍 <span id="detail-event-location"></span></div>
     <div class="detail-line">🔔 <span id="detail-event-reminders"></span></div>
-    <div class="detail-note"><strong>รายละเอียด</strong><p id="detail-event-note"></p></div>
+    <div class="detail-note"><strong>รายละเอียด / บันทึก</strong><p id="detail-event-note"></p></div>
+    <div class="detail-photo-section">
+      <strong>รูปประกอบ</strong>
+      <div id="detail-event-images" class="detail-photo-grid"><span class="photo-empty">กำลังโหลดรูป...</span></div>
+    </div>
     <button id="export-calendar" class="calendar-export-btn" type="button">📅 เพิ่มลง Calendar (.ics)</button>
     <div class="detail-actions">
       <button id="edit-event" class="edit-btn" type="button">แก้ไข</button>
@@ -277,6 +295,12 @@
     <label>รายละเอียด</label>
     <textarea id="task-note" rows="4" placeholder="รายละเอียดเพิ่มเติม"></textarea>
 
+    <label>รูปประกอบ <small class="hint">เลือกจากคลังภาพได้ • สูงสุด 6 รูป</small></label>
+    <input id="task-photo-input" class="hidden-file-input" type="file" accept="image/*" multiple>
+    <button id="task-photo-button" class="photo-add-btn" type="button">＋ เพิ่มรูปจากคลังภาพ</button>
+    <p id="task-photo-status" class="photo-status"></p>
+    <div id="task-photo-preview" class="photo-preview-grid"></div>
+
     <button id="save-task" class="save-btn" type="button">บันทึกงาน</button>
   </div>
 </div>
@@ -293,6 +317,10 @@
     <div class="detail-line">📅 <span id="detail-task-date"></span></div>
     <div class="detail-line">⚑ <span id="detail-task-priority"></span></div>
     <div class="detail-note"><strong>รายละเอียด</strong><p id="detail-task-note"></p></div>
+    <div class="detail-photo-section">
+      <strong>รูปประกอบ</strong>
+      <div id="detail-task-images" class="detail-photo-grid"><span class="photo-empty">กำลังโหลดรูป...</span></div>
+    </div>
     <button id="complete-task" class="complete-btn" type="button">✓ ทำเสร็จแล้ว</button>
     <div class="detail-actions">
       <button id="edit-task" class="edit-btn" type="button">แก้ไข</button>
@@ -314,6 +342,13 @@
 
     <label>ชื่อโปรเจกต์</label>
     <input id="freelance-name" type="text" placeholder="เช่น โปรเจกต์ 1 / MASS SPORT CLUB">
+
+    <label>สถานะงาน <small class="hint">เลือก 1 ช่อง</small></label>
+    <div class="check-list compact single-check" data-group="freelance-status">
+      <label class="check-row"><input type="checkbox" value="talking"><span class="box">✓</span><span>💬 งานที่กำลังคุย</span></label>
+      <label class="check-row"><input type="checkbox" value="in_progress"><span class="box">✓</span><span>🔵 อยู่ระหว่างดำเนินการ</span></label>
+      <label class="check-row"><input type="checkbox" value="paid"><span class="box">✓</span><span>✅ เบิกเงินแล้วเสร็จ</span></label>
+    </div>
 
     <label>เงินทั้งหมด</label>
     <input id="freelance-total-input" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0">
@@ -340,6 +375,7 @@
 
     <div class="client-detail-label">ผู้ว่าจ้าง / ลูกค้า</div>
     <div id="detail-freelance-client" class="client-detail-name"></div>
+    <div id="detail-freelance-status" class="freelance-status-badge"></div>
     <h2 id="detail-freelance-name"></h2>
     <div class="money-detail"><span>เงินทั้งหมด</span><strong id="detail-freelance-total"></strong></div>
     <div class="money-detail"><span>รับมาแล้ว</span><strong id="detail-freelance-received"></strong></div>
@@ -352,6 +388,15 @@
   </div>
 </div>
 
+<!-- PHOTO VIEWER -->
+<div id="photo-viewer-modal" class="modal photo-viewer-modal">
+  <div class="photo-viewer-box">
+    <button id="close-photo-viewer" class="photo-viewer-close" type="button">×</button>
+    <img id="photo-viewer-image" alt="รูปประกอบแบบขยาย">
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script type="module" src="script.js"></script>
 </body>
 </html>

@@ -303,3 +303,83 @@
   .client-money-summary{grid-template-columns:1fr 1fr}
   .client-money-summary .remaining{grid-column:1/-1}
 }
+
+
+/* =========================================================
+   V0.8 IMAGE ATTACHMENTS
+   ========================================================= */
+.hidden-file-input{display:none}
+.photo-add-btn{width:100%;min-height:46px;margin-top:7px;border:1px dashed #9ab7e8;border-radius:13px;background:#f7faff;color:#2878ff;font-size:14px;font-weight:700}
+.photo-status{min-height:18px;margin:7px 0 0;color:#8793a8;font-size:12px;line-height:1.4}
+.photo-preview-grid,.detail-photo-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:10px}
+.photo-preview-item,.detail-photo-item{position:relative;overflow:hidden;aspect-ratio:1/1;border:1px solid #e0e7f1;border-radius:12px;background:#f1f4f8}
+.photo-preview-item img,.detail-photo-item img{display:block;width:100%;height:100%;object-fit:cover;cursor:pointer}
+.photo-remove-btn{position:absolute;top:5px;right:5px;width:26px;height:26px;padding:0;border:0;border-radius:50%;background:rgba(20,32,55,.78);color:#fff;font-size:16px;line-height:1}
+.photo-size-badge{position:absolute;left:5px;bottom:5px;padding:3px 5px;border-radius:7px;background:rgba(20,32,55,.72);color:#fff;font-size:9px}
+.detail-photo-section{margin-top:16px;padding:15px;border-radius:14px;background:#f7faff}
+.detail-photo-section>strong{display:block;margin-bottom:4px}
+.photo-empty{grid-column:1/-1;color:#98a3b5;font-size:12px}
+.photo-viewer-modal{z-index:1600;background:rgba(7,13,25,.9)}
+.photo-viewer-box{position:relative;width:100%;max-width:760px;max-height:90vh;display:flex;align-items:center;justify-content:center}
+.photo-viewer-box img{display:block;max-width:100%;max-height:86vh;border-radius:14px;object-fit:contain;background:#111}
+.photo-viewer-close{position:absolute;top:-8px;right:-4px;z-index:2;width:42px;height:42px;border:0;border-radius:50%;background:#fff;color:#17233f;font-size:25px;box-shadow:0 4px 16px rgba(0,0,0,.25)}
+
+/* =========================================================
+   V0.8 FREELANCE STATUS
+   ========================================================= */
+.freelance-status-section{margin-bottom:24px}
+.freelance-status-header{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0 0 10px;padding:12px 14px;border-radius:16px;background:#f4f7fb}
+.freelance-status-header h3{margin:0;color:#17233f;font-size:17px}
+.freelance-status-header span{padding:5px 9px;border-radius:999px;background:#fff;color:#6c788d;font-size:11px;font-weight:700}
+.freelance-status-section.talking .freelance-status-header{background:#fff7e8}
+.freelance-status-section.in_progress .freelance-status-header{background:#eef5ff}
+.freelance-status-section.paid .freelance-status-header{background:#edf9f4}
+.freelance-status-badge{display:inline-block;margin:0 0 10px;padding:6px 10px;border-radius:999px;font-size:12px;font-weight:700}
+.freelance-status-badge.talking{background:#fff3d8;color:#a96a00}
+.freelance-status-badge.in_progress{background:#eaf2ff;color:#2878ff}
+.freelance-status-badge.paid{background:#e8f7f0;color:#12835c}
+.freelance-status-empty{margin:0;padding:16px;border:1px dashed #dfe6ef;border-radius:14px;color:#98a3b5;text-align:center;font-size:12px}
+@media(max-width:500px){.photo-preview-grid,.detail-photo-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.photo-viewer-box{max-width:100%}}
+
+
+/* =========================
+EXCEL EXPORT
+========================= */
+
+.excel-export-panel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 16px;
+  margin-bottom: 18px;
+  border: 1px solid #dfe8f7;
+  border-radius: 18px;
+  background: #f7faff;
+}
+
+.excel-export-panel strong {
+  color: #16245c;
+}
+
+.excel-export-panel p {
+  margin: 5px 0 0;
+  color: #7d899d;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.excel-export-panel .primary-btn {
+  flex: 0 0 auto;
+}
+
+@media (max-width: 390px) {
+  .excel-export-panel {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .excel-export-panel .primary-btn {
+    width: 100%;
+  }
+}

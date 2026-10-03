@@ -7,7 +7,7 @@
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#2878ff",
-  "description": "Personal life planner",
+  "description": "Personal life planner with cloud sync, freelance tracking and photo attachments",
   "icons": [
     {
       "src": "icon.svg",

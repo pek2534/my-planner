@@ -14,7 +14,11 @@ import {
   setDoc,
   deleteDoc,
   onSnapshot,
-  serverTimestamp
+  serverTimestamp,
+  getDocs,
+  query,
+  where,
+  Bytes
 } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js";
 
 // =========================================================
@@ -48,6 +52,13 @@ const categories = {
   study: { name: "เรียน / พัฒนา", icon: "📚", color: "#e59323" },
   finance: { name: "การเงิน", icon: "💰", color: "#16a085" }
 };
+
+const freelanceStatuses = {
+  talking: { name: "งานที่กำลังคุย", icon: "💬" },
+  in_progress: { name: "อยู่ระหว่างดำเนินการ", icon: "🔵" },
+  paid: { name: "เบิกเงินแล้วเสร็จ", icon: "✅" }
+};
+const freelanceStatusOrder = ["talking", "in_progress", "paid"];
 
 const $ = id => document.getElementById(id);
 
@@ -145,6 +156,7 @@ function normalizeFreelance(list) {
     id: String(project.id ?? makeId("freelance")),
     clientName: normalizeClientName(project.clientName || project.client || "ไม่ระบุผู้ว่าจ้าง"),
     name: project.name || "ไม่มีชื่อโปรเจกต์",
+    status: freelanceStatuses[project.status] ? project.status : "in_progress",
     totalAmount: Math.max(0, Number(project.totalAmount) || 0),
     receivedAmount: Math.max(0, Number(project.receivedAmount) || 0)
   }));
@@ -157,6 +169,10 @@ function normalizeClientName(value) {
 
 function clientGroupKey(value) {
   return normalizeClientName(value).toLocaleLowerCase("th-TH");
+}
+
+function freelanceStatusInfo(value) {
+  return freelanceStatuses[value] || freelanceStatuses.in_progress;
 }
 
 function makeId(prefix) {
@@ -241,6 +257,7 @@ function bindSingleCheckGroup(group) {
 }
 
 bindSingleCheckGroup("task-priority");
+bindSingleCheckGroup("freelance-status");
 
 function setSyncState(text, state = "busy") {
   syncStatus.textContent = text;
@@ -286,6 +303,7 @@ function firestoreFreelanceData(project) {
   return {
     clientName: normalizeClientName(project.clientName),
     name: project.name,
+    status: freelanceStatuses[project.status] ? project.status : "in_progress",
     totalAmount: Number(project.totalAmount) || 0,
     receivedAmount: Number(project.receivedAmount) || 0,
     updatedAt: serverTimestamp()
@@ -887,6 +905,47 @@ function createClientGroup(clientName, projects) {
   return group;
 }
 
+function createFreelanceStatusSection(statusKey, projects) {
+  const info = freelanceStatusInfo(statusKey);
+  const section = document.createElement("section");
+  section.className = `freelance-status-section ${statusKey}`;
+
+  const header = document.createElement("div");
+  header.className = "freelance-status-header";
+  const title = document.createElement("h3");
+  title.textContent = `${info.icon} ${info.name}`;
+  const count = document.createElement("span");
+  count.textContent = `${projects.length} โปรเจกต์`;
+  header.append(title, count);
+  section.appendChild(header);
+
+  if (!projects.length) {
+    const empty = document.createElement("p");
+    empty.className = "freelance-status-empty";
+    empty.textContent = "ยังไม่มีโปรเจกต์ในสถานะนี้";
+    section.appendChild(empty);
+    return section;
+  }
+
+  const groups = new Map();
+  projects.forEach(project => {
+    const displayName = normalizeClientName(project.clientName);
+    const key = clientGroupKey(displayName);
+    if (!groups.has(key)) groups.set(key, { clientName: displayName, projects: [] });
+    groups.get(key).projects.push(project);
+  });
+
+  [...groups.values()]
+    .sort((a, b) => {
+      if (a.clientName === "ไม่ระบุผู้ว่าจ้าง") return 1;
+      if (b.clientName === "ไม่ระบุผู้ว่าจ้าง") return -1;
+      return a.clientName.localeCompare(b.clientName, "th");
+    })
+    .forEach(group => section.appendChild(createClientGroup(group.clientName, group.projects)));
+
+  return section;
+}
+
 function renderFreelancePage() {
   const list = $("freelance-list");
   list.innerHTML = "";
@@ -905,24 +964,10 @@ function renderFreelancePage() {
     return;
   }
 
-  const groups = new Map();
-
-  freelanceProjects.forEach(project => {
-    const displayName = normalizeClientName(project.clientName);
-    const key = clientGroupKey(displayName);
-    if (!groups.has(key)) {
-      groups.set(key, { clientName: displayName, projects: [] });
-    }
-    groups.get(key).projects.push(project);
+  freelanceStatusOrder.forEach(statusKey => {
+    const projects = freelanceProjects.filter(project => project.status === statusKey);
+    list.appendChild(createFreelanceStatusSection(statusKey, projects));
   });
-
-  [...groups.values()]
-    .sort((a, b) => {
-      if (a.clientName === "ไม่ระบุผู้ว่าจ้าง") return 1;
-      if (b.clientName === "ไม่ระบุผู้ว่าจ้าง") return -1;
-      return a.clientName.localeCompare(b.clientName, "th");
-    })
-    .forEach(group => list.appendChild(createClientGroup(group.clientName, group.projects)));
 }
 
 function renderEverything() {
@@ -932,6 +977,354 @@ function renderEverything() {
   renderTaskPage();
   renderFreelancePage();
   updateNotificationStatus();
+}
+
+
+
+// =========================================================
+// EXCEL EXPORT — GOVERNMENT APPOINTMENTS
+// =========================================================
+
+function thaiShortDate(key) {
+  return dateFromKey(key).toLocaleDateString("th-TH", {
+    day: "numeric",
+    month: "short",
+    year: "numeric"
+  });
+}
+
+function eventCategoryText(event) {
+  return (event.categories || [])
+    .map(key => categoryInfo(key).name)
+    .join(", ");
+}
+
+function exportGovernmentAppointmentsToExcel() {
+  if (!currentUser) {
+    alert("กรุณาเข้าสู่ระบบก่อนส่งออกข้อมูล");
+    return;
+  }
+
+  if (!window.XLSX) {
+    alert("โหลดระบบสร้างไฟล์ Excel ไม่สำเร็จ กรุณาต่ออินเทอร์เน็ตแล้วลองใหม่");
+    return;
+  }
+
+  const governmentEvents = events
+    .filter(event => (event.categories || []).includes("government"))
+    .sort((a, b) => {
+      const byDate = String(a.date).localeCompare(String(b.date));
+      if (byDate !== 0) return byDate;
+      return String(a.startTime || "").localeCompare(String(b.startTime || ""));
+    });
+
+  if (!governmentEvents.length) {
+    alert("ยังไม่มีนัดหมายที่อยู่ในหมวดงานราชการ");
+    return;
+  }
+
+  const rows = governmentEvents.map((event, index) => ({
+    "ลำดับ": index + 1,
+    "วันที่ (เรียงข้อมูล)": event.date,
+    "วันที่แบบไทย": thaiShortDate(event.date),
+    "เวลา": event.startTime || "",
+    "เรื่อง / นัดหมาย": event.title || "",
+    "สถานที่": event.location || "",
+    "รายละเอียด / บันทึก": event.note || "",
+    "แจ้งเตือน": reminderText(event.reminders || []),
+    "หมวดหมู่": eventCategoryText(event)
+  }));
+
+  const worksheet = window.XLSX.utils.json_to_sheet(rows);
+  worksheet["!cols"] = [
+    { wch: 8 },
+    { wch: 16 },
+    { wch: 20 },
+    { wch: 10 },
+    { wch: 34 },
+    { wch: 28 },
+    { wch: 55 },
+    { wch: 24 },
+    { wch: 28 }
+  ];
+  worksheet["!autofilter"] = { ref: `A1:I${rows.length + 1}` };
+
+  const workbook = window.XLSX.utils.book_new();
+  window.XLSX.utils.book_append_sheet(workbook, worksheet, "งานราชการ");
+
+  const filename = `MyPlanner_งานราชการ_${formatDateKey(new Date())}.xlsx`;
+  window.XLSX.writeFile(workbook, filename, { compression: true });
+}
+
+const governmentExcelButton = $("export-government-excel");
+if (governmentExcelButton) {
+  governmentExcelButton.addEventListener("click", exportGovernmentAppointmentsToExcel);
+}
+
+// =========================================================
+// IMAGE ATTACHMENTS (FIRESTORE BYTES)
+// Images are compressed in the browser before upload.
+// =========================================================
+
+const MAX_IMAGES_PER_ITEM = 6;
+const TARGET_IMAGE_BYTES = 430 * 1024;
+const pendingImages = { event: [], task: [] };
+const galleryUrls = new Map();
+
+function pendingPreviewId(type) {
+  return type === "event" ? "event-photo-preview" : "task-photo-preview";
+}
+
+function photoStatusId(type) {
+  return type === "event" ? "event-photo-status" : "task-photo-status";
+}
+
+function editingParentId(type) {
+  return type === "event" ? editingEventId : editingTaskId;
+}
+
+function clearPendingImages(type) {
+  pendingImages[type].forEach(item => URL.revokeObjectURL(item.previewUrl));
+  pendingImages[type] = [];
+  renderPendingImagePreview(type);
+  const status = $(photoStatusId(type));
+  if (status) status.textContent = "";
+}
+
+function renderPendingImagePreview(type) {
+  const container = $(pendingPreviewId(type));
+  if (!container) return;
+  container.innerHTML = "";
+
+  pendingImages[type].forEach((item, index) => {
+    const wrap = document.createElement("div");
+    wrap.className = "photo-preview-item";
+
+    const img = document.createElement("img");
+    img.src = item.previewUrl;
+    img.alt = `รูปที่เลือก ${index + 1}`;
+    img.addEventListener("click", () => openPhotoViewer(item.previewUrl));
+
+    const size = document.createElement("span");
+    size.className = "photo-size-badge";
+    size.textContent = `${Math.max(1, Math.round(item.blob.size / 1024))} KB`;
+
+    const remove = document.createElement("button");
+    remove.type = "button";
+    remove.className = "photo-remove-btn";
+    remove.textContent = "×";
+    remove.setAttribute("aria-label", "ลบรูปที่เลือก");
+    remove.addEventListener("click", () => {
+      URL.revokeObjectURL(item.previewUrl);
+      pendingImages[type].splice(index, 1);
+      renderPendingImagePreview(type);
+    });
+
+    wrap.append(img, size, remove);
+    container.appendChild(wrap);
+  });
+}
+
+function loadImageElement(file) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const image = new Image();
+    image.onload = () => {
+      URL.revokeObjectURL(url);
+      resolve(image);
+    };
+    image.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error("ไม่สามารถอ่านไฟล์รูปนี้ได้"));
+    };
+    image.src = url;
+  });
+}
+
+function canvasToBlob(canvas, quality) {
+  return new Promise((resolve, reject) => {
+    canvas.toBlob(blob => {
+      if (blob) resolve(blob);
+      else reject(new Error("บีบอัดรูปไม่สำเร็จ"));
+    }, "image/jpeg", quality);
+  });
+}
+
+async function compressImage(file) {
+  const image = await loadImageElement(file);
+  let maxSide = 1500;
+  let quality = 0.78;
+  let blob = null;
+
+  for (let dimensionPass = 0; dimensionPass < 3; dimensionPass += 1) {
+    const scale = Math.min(1, maxSide / Math.max(image.naturalWidth || image.width, image.naturalHeight || image.height));
+    const width = Math.max(1, Math.round((image.naturalWidth || image.width) * scale));
+    const height = Math.max(1, Math.round((image.naturalHeight || image.height) * scale));
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const context = canvas.getContext("2d", { alpha: false });
+    context.fillStyle = "#ffffff";
+    context.fillRect(0, 0, width, height);
+    context.drawImage(image, 0, 0, width, height);
+
+    quality = 0.78;
+    while (quality >= 0.42) {
+      blob = await canvasToBlob(canvas, quality);
+      if (blob.size <= TARGET_IMAGE_BYTES) return blob;
+      quality -= 0.08;
+    }
+
+    maxSide = Math.round(maxSide * 0.78);
+  }
+
+  if (!blob || blob.size > 650 * 1024) {
+    throw new Error("รูปนี้ยังมีขนาดใหญ่เกินไปหลังบีบอัด");
+  }
+  return blob;
+}
+
+async function getAttachmentRecords(parentType, parentId) {
+  if (!currentUser || !parentId) return [];
+  const parentKey = `${parentType}:${parentId}`;
+  const snapshot = await getDocs(query(userCollection("attachments"), where("parentKey", "==", parentKey)));
+  return snapshot.docs.map(item => ({ id: item.id, ...item.data() }));
+}
+
+async function handlePhotoSelection(type, input) {
+  const files = [...(input.files || [])].filter(file => file.type.startsWith("image/"));
+  input.value = "";
+  if (!files.length) return;
+
+  const status = $(photoStatusId(type));
+  const parentId = editingParentId(type);
+  let existingCount = 0;
+
+  try {
+    if (parentId) existingCount = (await getAttachmentRecords(type, parentId)).length;
+  } catch (error) {
+    console.error(error);
+  }
+
+  const available = MAX_IMAGES_PER_ITEM - existingCount - pendingImages[type].length;
+  if (available <= 0) {
+    alert(`รายการนี้มีรูปครบ ${MAX_IMAGES_PER_ITEM} รูปแล้ว`);
+    return;
+  }
+
+  const selected = files.slice(0, available);
+  if (files.length > available) alert(`เพิ่มได้อีก ${available} รูป ระบบจะใช้เฉพาะ ${available} รูปแรก`);
+
+  status.textContent = "กำลังบีบอัดรูปอัตโนมัติ...";
+  for (const file of selected) {
+    try {
+      const blob = await compressImage(file);
+      const previewUrl = URL.createObjectURL(blob);
+      pendingImages[type].push({ blob, previewUrl, originalName: file.name || "photo.jpg" });
+      renderPendingImagePreview(type);
+    } catch (error) {
+      console.error(error);
+      alert(`ข้ามรูป ${file.name || "1 รูป"}: ${error.message}`);
+    }
+  }
+  status.textContent = pendingImages[type].length ? `พร้อมอัปโหลด ${pendingImages[type].length} รูป • ระบบบีบอัดให้แล้ว` : "";
+}
+
+async function uploadPendingAttachments(type, parentId) {
+  const items = [...pendingImages[type]];
+  if (!items.length) return;
+
+  const status = $(photoStatusId(type));
+  let completed = 0;
+  for (const item of items) {
+    const attachmentId = makeId("photo");
+    const uint8 = new Uint8Array(await item.blob.arrayBuffer());
+    await setDoc(userDoc("attachments", attachmentId), {
+      parentKey: `${type}:${parentId}`,
+      parentType: type,
+      parentId: String(parentId),
+      mimeType: "image/jpeg",
+      originalName: item.originalName,
+      size: uint8.byteLength,
+      imageBytes: Bytes.fromUint8Array(uint8),
+      createdAt: serverTimestamp()
+    });
+    completed += 1;
+    if (status) status.textContent = `อัปโหลดรูป ${completed}/${items.length}...`;
+  }
+  clearPendingImages(type);
+}
+
+function clearGalleryObjectUrls(containerId) {
+  const urls = galleryUrls.get(containerId) || [];
+  urls.forEach(url => URL.revokeObjectURL(url));
+  galleryUrls.set(containerId, []);
+}
+
+function openPhotoViewer(url) {
+  $("photo-viewer-image").src = url;
+  $("photo-viewer-modal").classList.add("show");
+}
+
+async function renderAttachmentGallery(parentType, parentId, containerId) {
+  const container = $(containerId);
+  if (!container) return;
+  clearGalleryObjectUrls(containerId);
+  container.innerHTML = '<span class="photo-empty">กำลังโหลดรูป...</span>';
+
+  try {
+    const records = await getAttachmentRecords(parentType, parentId);
+    container.innerHTML = "";
+    if (!records.length) {
+      container.innerHTML = '<span class="photo-empty">ไม่มีรูปประกอบ</span>';
+      return;
+    }
+
+    records.sort((a, b) => (a.createdAt?.seconds || 0) - (b.createdAt?.seconds || 0));
+    const urls = [];
+    records.forEach(record => {
+      if (!record.imageBytes || typeof record.imageBytes.toUint8Array !== "function") return;
+      const blob = new Blob([record.imageBytes.toUint8Array()], { type: record.mimeType || "image/jpeg" });
+      const url = URL.createObjectURL(blob);
+      urls.push(url);
+
+      const wrap = document.createElement("div");
+      wrap.className = "detail-photo-item";
+      const img = document.createElement("img");
+      img.src = url;
+      img.alt = "รูปประกอบ";
+      img.addEventListener("click", () => openPhotoViewer(url));
+
+      const remove = document.createElement("button");
+      remove.type = "button";
+      remove.className = "photo-remove-btn";
+      remove.textContent = "×";
+      remove.setAttribute("aria-label", "ลบรูปนี้");
+      remove.addEventListener("click", async event => {
+        event.stopPropagation();
+        if (!confirm("ต้องการลบรูปนี้ใช่หรือไม่?")) return;
+        try {
+          await deleteDoc(userDoc("attachments", record.id));
+          await renderAttachmentGallery(parentType, parentId, containerId);
+        } catch (error) {
+          console.error(error);
+          alert("ลบรูปไม่สำเร็จ");
+        }
+      });
+
+      wrap.append(img, remove);
+      container.appendChild(wrap);
+    });
+    galleryUrls.set(containerId, urls);
+  } catch (error) {
+    console.error(error);
+    container.innerHTML = '<span class="photo-empty">โหลดรูปไม่สำเร็จ</span>';
+  }
+}
+
+async function deleteAllAttachments(parentType, parentId) {
+  const records = await getAttachmentRecords(parentType, parentId);
+  for (const record of records) await deleteDoc(userDoc("attachments", record.id));
 }
 
 // =========================================================
@@ -956,6 +1349,7 @@ function openAddEvent(date = selectedDate) {
   eventStart.value = "09:00";
   eventLocation.value = "";
   eventNote.value = "";
+  clearPendingImages("event");
   eventModal.classList.add("show");
 }
 
@@ -972,6 +1366,7 @@ function openEditEvent(id) {
   eventStart.value = event.startTime;
   eventLocation.value = event.location;
   eventNote.value = event.note;
+  clearPendingImages("event");
   eventDetailModal.classList.remove("show");
   eventModal.classList.add("show");
 }
@@ -1005,6 +1400,7 @@ async function saveEvent() {
   try {
     setSyncState("กำลังบันทึกนัดหมาย...", "busy");
     await setDoc(userDoc("events", id), firestoreEventData(data), { merge: true });
+    await uploadPendingAttachments("event", id);
 
     selectedDate = dateFromKey(date);
     currentMonth = selectedDate.getMonth();
@@ -1040,6 +1436,7 @@ function openEventDetail(id) {
   $("detail-event-reminders").textContent = reminderText(event.reminders);
   $("detail-event-note").textContent = event.note || "ไม่มีรายละเอียดเพิ่มเติม";
   eventDetailModal.classList.add("show");
+  renderAttachmentGallery("event", event.id, "detail-event-images");
 }
 
 // =========================================================
@@ -1060,6 +1457,7 @@ function openAddTask(date = selectedDate) {
   taskDate.value = formatDateKey(date);
   setChecks("task-priority", ["normal"]);
   taskNote.value = "";
+  clearPendingImages("task");
   taskModal.classList.add("show");
 }
 
@@ -1074,6 +1472,7 @@ function openEditTask(id) {
   taskDate.value = task.date;
   setChecks("task-priority", [task.priority]);
   taskNote.value = task.note;
+  clearPendingImages("task");
   taskDetailModal.classList.remove("show");
   taskModal.classList.add("show");
 }
@@ -1106,6 +1505,7 @@ async function saveTask() {
   try {
     setSyncState("กำลังบันทึกงาน...", "busy");
     await setDoc(userDoc("tasks", id), firestoreTaskData(data), { merge: true });
+    await uploadPendingAttachments("task", id);
     taskModal.classList.remove("show");
     editingTaskId = null;
   } catch (error) {
@@ -1125,6 +1525,7 @@ function openTaskDetail(id) {
   $("detail-task-date").textContent = thaiDate(task.date);
   $("detail-task-priority").textContent = priorityName(task.priority);
   $("detail-task-note").textContent = task.note || "ไม่มีรายละเอียดเพิ่มเติม";
+  renderAttachmentGallery("task", task.id, "detail-task-images");
 
   const complete = $("complete-task");
   complete.textContent = task.completed ? "↩ กลับเป็นยังไม่เสร็จ" : "✓ ทำเสร็จแล้ว";
@@ -1158,6 +1559,7 @@ function openAddFreelance() {
   $("freelance-form-title").textContent = "เพิ่มโปรเจกต์งานนอก";
   freelanceClient.value = "";
   freelanceName.value = "";
+  setChecks("freelance-status", ["talking"]);
   freelanceTotalInput.value = "";
   freelanceReceivedInput.value = "";
   updateFreelancePreview();
@@ -1172,6 +1574,7 @@ function openEditFreelance(id) {
   $("freelance-form-title").textContent = "แก้ไขโปรเจกต์งานนอก";
   freelanceClient.value = project.clientName === "ไม่ระบุผู้ว่าจ้าง" ? "" : project.clientName;
   freelanceName.value = project.name;
+  setChecks("freelance-status", [project.status]);
   freelanceTotalInput.value = String(project.totalAmount);
   freelanceReceivedInput.value = String(project.receivedAmount);
   updateFreelancePreview();
@@ -1184,11 +1587,12 @@ async function saveFreelance() {
 
   const clientName = normalizeClientName(freelanceClient.value);
   const name = freelanceName.value.trim();
+  const status = getSingleCheck("freelance-status");
   const totalAmount = Number(freelanceTotalInput.value);
   const receivedAmount = Number(freelanceReceivedInput.value);
 
-  if (!name || !Number.isFinite(totalAmount) || !Number.isFinite(receivedAmount)) {
-    alert("กรุณากรอกชื่อโปรเจกต์ เงินทั้งหมด และรับมาแล้วให้ครบ");
+  if (!name || !status || !Number.isFinite(totalAmount) || !Number.isFinite(receivedAmount)) {
+    alert("กรุณากรอกชื่อโปรเจกต์ เลือกสถานะ เงินทั้งหมด และรับมาแล้วให้ครบ");
     return;
   }
 
@@ -1203,7 +1607,7 @@ async function saveFreelance() {
   }
 
   const id = editingFreelanceId || makeId("freelance");
-  const data = { id, clientName, name, totalAmount, receivedAmount };
+  const data = { id, clientName, name, status, totalAmount, receivedAmount };
 
   try {
     setSyncState("กำลังบันทึกงานนอก...", "busy");
@@ -1223,6 +1627,10 @@ function openFreelanceDetail(id) {
 
   selectedFreelanceId = project.id;
   $("detail-freelance-client").textContent = project.clientName;
+  const statusInfo = freelanceStatusInfo(project.status);
+  const statusBadge = $("detail-freelance-status");
+  statusBadge.className = `freelance-status-badge ${project.status}`;
+  statusBadge.textContent = `${statusInfo.icon} ${statusInfo.name}`;
   $("detail-freelance-name").textContent = project.name;
   $("detail-freelance-total").textContent = formatMoney(project.totalAmount);
   $("detail-freelance-received").textContent = formatMoney(project.receivedAmount);
@@ -1271,6 +1679,15 @@ $("save-event").addEventListener("click", saveEvent);
 $("save-task").addEventListener("click", saveTask);
 $("save-freelance").addEventListener("click", saveFreelance);
 
+$("event-photo-button").addEventListener("click", () => $("event-photo-input").click());
+$("task-photo-button").addEventListener("click", () => $("task-photo-input").click());
+$("event-photo-input").addEventListener("change", event => handlePhotoSelection("event", event.target));
+$("task-photo-input").addEventListener("change", event => handlePhotoSelection("task", event.target));
+$("close-photo-viewer").addEventListener("click", () => $("photo-viewer-modal").classList.remove("show"));
+$("photo-viewer-modal").addEventListener("click", event => {
+  if (event.target === $("photo-viewer-modal")) $("photo-viewer-modal").classList.remove("show");
+});
+
 $("edit-event").addEventListener("click", () => {
   if (selectedEventId !== null) openEditEvent(selectedEventId);
 });
@@ -1281,6 +1698,7 @@ $("delete-event").addEventListener("click", async () => {
 
   try {
     setSyncState("กำลังลบนัดหมาย...", "busy");
+    await deleteAllAttachments("event", event.id);
     await deleteDoc(userDoc("events", event.id));
     selectedEventId = null;
     eventDetailModal.classList.remove("show");
@@ -1301,6 +1719,7 @@ $("delete-task").addEventListener("click", async () => {
 
   try {
     setSyncState("กำลังลบงาน...", "busy");
+    await deleteAllAttachments("task", task.id);
     await deleteDoc(userDoc("tasks", task.id));
     selectedTaskId = null;
     taskDetailModal.classList.remove("show");
