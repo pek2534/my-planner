@@ -12,6 +12,25 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
+
+<div id="login-screen" class="login-screen">
+  <div class="login-card">
+    <div class="login-logo">✓</div>
+    <h1>My Planner</h1>
+    <p>เข้าสู่ระบบเพื่อซิงก์นัดหมายและงานระหว่าง PC, iPhone และ iPad</p>
+
+    <label for="login-email">อีเมล</label>
+    <input id="login-email" type="email" autocomplete="username" placeholder="your@email.com">
+
+    <label for="login-password">รหัสผ่าน</label>
+    <input id="login-password" type="password" autocomplete="current-password" placeholder="••••••••">
+
+    <button id="login-button" class="save-btn" type="button">เข้าสู่ระบบ</button>
+    <p id="login-error" class="login-error" aria-live="polite"></p>
+    <small class="login-hint">ใช้บัญชีที่คุณสร้างไว้ใน Firebase Authentication</small>
+  </div>
+</div>
+
 <div class="app">
   <header class="top-bar">
     <div>
@@ -23,6 +42,14 @@
       <small>เวลาปัจจุบัน</small>
     </div>
   </header>
+
+  <section class="cloud-panel">
+    <div>
+      <div class="cloud-title"><span id="sync-dot" class="sync-dot"></span><strong id="sync-status">กำลังเชื่อมต่อ...</strong></div>
+      <small id="sync-user">ยังไม่ได้เข้าสู่ระบบ</small>
+    </div>
+    <button id="logout-button" class="ghost-btn" type="button">ออกจากระบบ</button>
+  </section>
 
   <main id="today-page" class="page active">
     <section class="hero-card">
@@ -39,15 +66,15 @@
         <p id="notification-status">ยังไม่ได้เปิดการแจ้งเตือน</p>
       </div>
       <div class="notification-actions">
-        <button id="enable-notifications" class="small-add-btn">เปิดแจ้งเตือน</button>
-        <button id="test-notification" class="ghost-btn">ทดสอบ</button>
+        <button id="enable-notifications" class="small-add-btn" type="button">เปิดแจ้งเตือน</button>
+        <button id="test-notification" class="ghost-btn" type="button">ทดสอบ</button>
       </div>
     </section>
 
     <section>
       <div class="section-title-row">
         <h2>นัดหมายวันนี้</h2>
-        <button id="today-add-event" class="small-add-btn">+ นัด</button>
+        <button id="today-add-event" class="small-add-btn" type="button">+ นัด</button>
       </div>
       <div id="today-event-list"></div>
     </section>
@@ -55,7 +82,7 @@
     <section>
       <div class="section-title-row">
         <h2>งานวันนี้</h2>
-        <button id="today-add-task" class="small-add-btn">+ งาน</button>
+        <button id="today-add-task" class="small-add-btn" type="button">+ งาน</button>
       </div>
       <div id="today-task-summary" class="progress-text"></div>
       <div id="today-task-list"></div>
@@ -70,9 +97,9 @@
   <main id="calendar-page" class="page">
     <section class="calendar-card">
       <div class="calendar-header">
-        <button id="prev-month">‹</button>
+        <button id="prev-month" type="button">‹</button>
         <h2 id="month-title"></h2>
-        <button id="next-month">›</button>
+        <button id="next-month" type="button">›</button>
       </div>
       <div id="calendar" class="calendar"></div>
     </section>
@@ -80,7 +107,7 @@
     <section>
       <div class="section-title-row">
         <h2 id="appointment-title">นัดหมาย</h2>
-        <button id="calendar-add-event" class="small-add-btn">+ นัด</button>
+        <button id="calendar-add-event" class="small-add-btn" type="button">+ นัด</button>
       </div>
       <div id="event-list"></div>
     </section>
@@ -88,7 +115,7 @@
     <section>
       <div class="section-title-row">
         <h2>งานของวันนี้</h2>
-        <button id="calendar-add-task" class="small-add-btn">+ งาน</button>
+        <button id="calendar-add-task" class="small-add-btn" type="button">+ งาน</button>
       </div>
       <div id="calendar-task-list"></div>
     </section>
@@ -97,22 +124,22 @@
   <main id="tasks-page" class="page">
     <div class="section-title-row task-page-title">
       <div><span class="section-label">TASKS</span><h2>รายการงาน</h2></div>
-      <button id="task-add-button" class="primary-btn">+ เพิ่มงาน</button>
+      <button id="task-add-button" class="primary-btn" type="button">+ เพิ่มงาน</button>
     </div>
 
     <div class="task-filters">
-      <button class="filter-btn active" data-filter="pending">ต้องทำ</button>
-      <button class="filter-btn" data-filter="today">วันนี้</button>
-      <button class="filter-btn" data-filter="all">ทั้งหมด</button>
-      <button class="filter-btn" data-filter="done">เสร็จแล้ว</button>
+      <button class="filter-btn active" data-filter="pending" type="button">ต้องทำ</button>
+      <button class="filter-btn" data-filter="today" type="button">วันนี้</button>
+      <button class="filter-btn" data-filter="all" type="button">ทั้งหมด</button>
+      <button class="filter-btn" data-filter="done" type="button">เสร็จแล้ว</button>
     </div>
     <div id="all-task-list"></div>
   </main>
 
   <nav class="bottom-nav">
-    <button class="nav-btn active" data-page="today-page"><span>⌂</span>วันนี้</button>
-    <button class="nav-btn" data-page="calendar-page"><span>▣</span>ปฏิทิน</button>
-    <button class="nav-btn" data-page="tasks-page"><span>✓</span>งาน</button>
+    <button class="nav-btn active" data-page="today-page" type="button"><span>⌂</span>วันนี้</button>
+    <button class="nav-btn" data-page="calendar-page" type="button"><span>▣</span>ปฏิทิน</button>
+    <button class="nav-btn" data-page="tasks-page" type="button"><span>✓</span>งาน</button>
   </nav>
 </div>
 
@@ -121,7 +148,7 @@
   <div class="modal-box">
     <div class="modal-header">
       <h2 id="event-form-title">เพิ่มนัดหมาย</h2>
-      <button id="close-event-form" class="close-btn">×</button>
+      <button id="close-event-form" class="close-btn" type="button">×</button>
     </div>
 
     <label>ชื่อนัดหมาย</label>
@@ -160,7 +187,7 @@
     <label>รายละเอียด</label>
     <textarea id="event-note" rows="4" placeholder="รายละเอียดเพิ่มเติม"></textarea>
 
-    <button id="save-event" class="save-btn">บันทึกนัดหมาย</button>
+    <button id="save-event" class="save-btn" type="button">บันทึกนัดหมาย</button>
   </div>
 </div>
 
@@ -169,7 +196,7 @@
   <div class="modal-box">
     <div class="modal-header">
       <h2>รายละเอียดนัดหมาย</h2>
-      <button id="close-event-detail" class="close-btn">×</button>
+      <button id="close-event-detail" class="close-btn" type="button">×</button>
     </div>
     <div id="detail-event-categories" class="badge-wrap"></div>
     <h2 id="detail-event-title"></h2>
@@ -178,10 +205,10 @@
     <div class="detail-line">📍 <span id="detail-event-location"></span></div>
     <div class="detail-line">🔔 <span id="detail-event-reminders"></span></div>
     <div class="detail-note"><strong>รายละเอียด</strong><p id="detail-event-note"></p></div>
-    <button id="export-calendar" class="calendar-export-btn">📅 เพิ่มลง Calendar (.ics)</button>
+    <button id="export-calendar" class="calendar-export-btn" type="button">📅 เพิ่มลง Calendar (.ics)</button>
     <div class="detail-actions">
-      <button id="edit-event" class="edit-btn">แก้ไข</button>
-      <button id="delete-event" class="delete-btn">ลบนัดหมาย</button>
+      <button id="edit-event" class="edit-btn" type="button">แก้ไข</button>
+      <button id="delete-event" class="delete-btn" type="button">ลบนัดหมาย</button>
     </div>
   </div>
 </div>
@@ -191,7 +218,7 @@
   <div class="modal-box">
     <div class="modal-header">
       <h2 id="task-form-title">เพิ่มงาน</h2>
-      <button id="close-task-form" class="close-btn">×</button>
+      <button id="close-task-form" class="close-btn" type="button">×</button>
     </div>
 
     <label>ชื่องาน</label>
@@ -220,7 +247,7 @@
     <label>รายละเอียด</label>
     <textarea id="task-note" rows="4" placeholder="รายละเอียดเพิ่มเติม"></textarea>
 
-    <button id="save-task" class="save-btn">บันทึกงาน</button>
+    <button id="save-task" class="save-btn" type="button">บันทึกงาน</button>
   </div>
 </div>
 
@@ -229,21 +256,21 @@
   <div class="modal-box">
     <div class="modal-header">
       <h2>รายละเอียดงาน</h2>
-      <button id="close-task-detail" class="close-btn">×</button>
+      <button id="close-task-detail" class="close-btn" type="button">×</button>
     </div>
     <div id="detail-task-categories" class="badge-wrap"></div>
     <h2 id="detail-task-title"></h2>
     <div class="detail-line">📅 <span id="detail-task-date"></span></div>
     <div class="detail-line">⚑ <span id="detail-task-priority"></span></div>
     <div class="detail-note"><strong>รายละเอียด</strong><p id="detail-task-note"></p></div>
-    <button id="complete-task" class="complete-btn">✓ ทำเสร็จแล้ว</button>
+    <button id="complete-task" class="complete-btn" type="button">✓ ทำเสร็จแล้ว</button>
     <div class="detail-actions">
-      <button id="edit-task" class="edit-btn">แก้ไข</button>
-      <button id="delete-task" class="delete-btn">ลบงาน</button>
+      <button id="edit-task" class="edit-btn" type="button">แก้ไข</button>
+      <button id="delete-task" class="delete-btn" type="button">ลบงาน</button>
     </div>
   </div>
 </div>
 
-<script src="script.js"></script>
+<script type="module" src="script.js"></script>
 </body>
 </html>

@@ -1,68 +1,1243 @@
-const categories={government:{name:"งานราชการ",icon:"🏛️",color:"#2878ff"},freelance:{name:"งานออกแบบ",icon:"💼",color:"#8b5cf6"},personal:{name:"ส่วนตัว",icon:"👤",color:"#14a673"},fitness:{name:"ออกกำลังกาย",icon:"🏋️",color:"#ef4e7b"},study:{name:"เรียน / พัฒนา",icon:"📚",color:"#e59323"},finance:{name:"การเงิน",icon:"💰",color:"#16a085"}};
-const $=id=>document.getElementById(id);
-const todayText=$("today-text"),timeText=$("time-text"),todayHeading=$("today-heading"),todayDayNumber=$("today-day-number"),calendar=$("calendar"),monthTitle=$("month-title"),prevMonth=$("prev-month"),nextMonth=$("next-month"),appointmentTitle=$("appointment-title"),eventList=$("event-list"),todayEventList=$("today-event-list"),todayTaskList=$("today-task-list"),todayTaskSummary=$("today-task-summary"),nextEvent=$("next-event"),calendarTaskList=$("calendar-task-list"),allTaskList=$("all-task-list"),notificationStatus=$("notification-status");
-const startDate=new Date();let currentMonth=startDate.getMonth(),currentYear=startDate.getFullYear(),selectedDate=new Date(startDate.getFullYear(),startDate.getMonth(),startDate.getDate()),selectedEventId=null,editingEventId=null,selectedTaskId=null,editingTaskId=null,taskFilter="pending";
-let events=JSON.parse(localStorage.getItem("planner-events")||"[]");let tasks=JSON.parse(localStorage.getItem("planner-tasks")||"[]");
-events=events.map(e=>({...e,categories:Array.isArray(e.categories)?e.categories:(e.category?[e.category]:["personal"]),reminders:Array.isArray(e.reminders)?e.reminders:[],location:e.location||"",note:e.note||""}));
-tasks=tasks.map(t=>({...t,categories:Array.isArray(t.categories)?t.categories:(t.category?[t.category]:["personal"]),priority:t.priority||"normal",completed:Boolean(t.completed),note:t.note||""}));
-function formatDateKey(d){return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`}
-function dateFromKey(k){const [y,m,d]=k.split("-").map(Number);return new Date(y,m-1,d)}
-function thaiDate(k){return dateFromKey(k).toLocaleDateString("th-TH",{weekday:"long",day:"numeric",month:"long",year:"numeric"})}
-function categoryInfo(k){return categories[k]||categories.personal}
-function priorityName(p){return p==="urgent"?"ด่วน":p==="high"?"สำคัญ":"ปกติ"}
-function saveAll(){localStorage.setItem("planner-events",JSON.stringify(events));localStorage.setItem("planner-tasks",JSON.stringify(tasks))}
-function emptyMessage(text){const el=document.createElement("div");el.className="empty-state";el.textContent=text;return el}
-function getChecks(group){return [...document.querySelectorAll(`[data-group="${group}"] input:checked`)].map(x=>x.value)}
-function setChecks(group,values){const set=new Set((values||[]).map(String));document.querySelectorAll(`[data-group="${group}"] input`).forEach(x=>x.checked=set.has(x.value))}
-function getSingleCheck(group){return getChecks(group)[0]||null}
-function bindSingleCheckGroup(group){document.querySelectorAll(`[data-group="${group}"] input`).forEach(input=>input.addEventListener("change",()=>{if(input.checked){document.querySelectorAll(`[data-group="${group}"] input`).forEach(other=>{if(other!==input)other.checked=false})}}))}
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js";
+import {
+  getAuth,
+  onAuthStateChanged,
+  signInWithEmailAndPassword,
+  signOut,
+  setPersistence,
+  browserLocalPersistence
+} from "https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js";
+import {
+  getFirestore,
+  collection,
+  doc,
+  setDoc,
+  deleteDoc,
+  onSnapshot,
+  serverTimestamp
+} from "https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js";
+
+// =========================================================
+// FIREBASE CONFIG
+// =========================================================
+
+const firebaseConfig = {
+  apiKey: "AIzaSyAHIFlYWxonoKlf5Gz9Ot4CrwLUp8RIOtU",
+  authDomain: "my-plan-bc3e8.firebaseapp.com",
+  projectId: "my-plan-bc3e8",
+  storageBucket: "my-plan-bc3e8.firebasestorage.app",
+  messagingSenderId: "1093515298267",
+  appId: "1:1093515298267:web:b9072718f0e5d9545d93fe",
+  measurementId: "G-H9VZPXCWSW"
+};
+
+const firebaseApp = initializeApp(firebaseConfig);
+const auth = getAuth(firebaseApp);
+const db = getFirestore(firebaseApp);
+const authPersistenceReady = setPersistence(auth, browserLocalPersistence);
+
+// =========================================================
+// APP DATA
+// =========================================================
+
+const categories = {
+  government: { name: "งานราชการ", icon: "🏛️", color: "#2878ff" },
+  freelance: { name: "งานออกแบบ", icon: "💼", color: "#8b5cf6" },
+  personal: { name: "ส่วนตัว", icon: "👤", color: "#14a673" },
+  fitness: { name: "ออกกำลังกาย", icon: "🏋️", color: "#ef4e7b" },
+  study: { name: "เรียน / พัฒนา", icon: "📚", color: "#e59323" },
+  finance: { name: "การเงิน", icon: "💰", color: "#16a085" }
+};
+
+const $ = id => document.getElementById(id);
+
+const todayText = $("today-text");
+const timeText = $("time-text");
+const todayHeading = $("today-heading");
+const todayDayNumber = $("today-day-number");
+const calendar = $("calendar");
+const monthTitle = $("month-title");
+const prevMonth = $("prev-month");
+const nextMonth = $("next-month");
+const appointmentTitle = $("appointment-title");
+const eventList = $("event-list");
+const todayEventList = $("today-event-list");
+const todayTaskList = $("today-task-list");
+const todayTaskSummary = $("today-task-summary");
+const nextEvent = $("next-event");
+const calendarTaskList = $("calendar-task-list");
+const allTaskList = $("all-task-list");
+const notificationStatus = $("notification-status");
+
+const loginScreen = $("login-screen");
+const loginEmail = $("login-email");
+const loginPassword = $("login-password");
+const loginButton = $("login-button");
+const loginError = $("login-error");
+const logoutButton = $("logout-button");
+const syncStatus = $("sync-status");
+const syncUser = $("sync-user");
+const syncDot = $("sync-dot");
+
+const startDate = new Date();
+let currentMonth = startDate.getMonth();
+let currentYear = startDate.getFullYear();
+let selectedDate = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
+let selectedEventId = null;
+let editingEventId = null;
+let selectedTaskId = null;
+let editingTaskId = null;
+let taskFilter = "pending";
+
+let currentUser = null;
+let unsubscribeEvents = null;
+let unsubscribeTasks = null;
+let events = normalizeEvents(JSON.parse(localStorage.getItem("planner-events") || "[]"));
+let tasks = normalizeTasks(JSON.parse(localStorage.getItem("planner-tasks") || "[]"));
+
+// =========================================================
+// NORMALIZE / UTILITIES
+// =========================================================
+
+function normalizeEvents(list) {
+  if (!Array.isArray(list)) return [];
+  return list.map(event => ({
+    ...event,
+    id: String(event.id ?? makeId("event")),
+    title: event.title || "ไม่มีชื่อ",
+    categories: Array.isArray(event.categories)
+      ? event.categories
+      : (event.category ? [event.category] : ["personal"]),
+    reminders: Array.isArray(event.reminders)
+      ? event.reminders.map(Number).filter(Number.isFinite)
+      : [],
+    date: event.date || formatDateKey(new Date()),
+    startTime: event.startTime || "09:00",
+    endTime: event.endTime || "10:00",
+    location: event.location || "",
+    note: event.note || ""
+  }));
+}
+
+function normalizeTasks(list) {
+  if (!Array.isArray(list)) return [];
+  return list.map(task => ({
+    ...task,
+    id: String(task.id ?? makeId("task")),
+    title: task.title || "ไม่มีชื่อ",
+    categories: Array.isArray(task.categories)
+      ? task.categories
+      : (task.category ? [task.category] : ["personal"]),
+    priority: task.priority || "normal",
+    completed: Boolean(task.completed),
+    date: task.date || formatDateKey(new Date()),
+    note: task.note || ""
+  }));
+}
+
+function makeId(prefix) {
+  if (window.crypto && typeof window.crypto.randomUUID === "function") {
+    return window.crypto.randomUUID();
+  }
+  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+}
+
+function formatDateKey(date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
+
+function dateFromKey(key) {
+  const [year, month, day] = key.split("-").map(Number);
+  return new Date(year, month - 1, day);
+}
+
+function thaiDate(key) {
+  return dateFromKey(key).toLocaleDateString("th-TH", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric"
+  });
+}
+
+function categoryInfo(key) {
+  return categories[key] || categories.personal;
+}
+
+function priorityName(priority) {
+  return priority === "urgent" ? "ด่วน" : priority === "high" ? "สำคัญ" : "ปกติ";
+}
+
+function saveLocalBackup() {
+  localStorage.setItem("planner-events", JSON.stringify(events));
+  localStorage.setItem("planner-tasks", JSON.stringify(tasks));
+}
+
+function emptyMessage(text) {
+  const element = document.createElement("div");
+  element.className = "empty-state";
+  element.textContent = text;
+  return element;
+}
+
+function getChecks(group) {
+  return [...document.querySelectorAll(`[data-group="${group}"] input:checked`)].map(input => input.value);
+}
+
+function setChecks(group, values) {
+  const selected = new Set((values || []).map(String));
+  document.querySelectorAll(`[data-group="${group}"] input`).forEach(input => {
+    input.checked = selected.has(input.value);
+  });
+}
+
+function getSingleCheck(group) {
+  return getChecks(group)[0] || null;
+}
+
+function bindSingleCheckGroup(group) {
+  document.querySelectorAll(`[data-group="${group}"] input`).forEach(input => {
+    input.addEventListener("change", () => {
+      if (!input.checked) return;
+      document.querySelectorAll(`[data-group="${group}"] input`).forEach(other => {
+        if (other !== input) other.checked = false;
+      });
+    });
+  });
+}
+
 bindSingleCheckGroup("task-priority");
-function updateClock(){const d=new Date();timeText.textContent=`${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}:${String(d.getSeconds()).padStart(2,"0")}`;todayText.textContent=d.toLocaleDateString("th-TH",{weekday:"long",day:"numeric",month:"long",year:"numeric"});todayHeading.textContent=d.toLocaleDateString("th-TH",{weekday:"long",month:"long"});todayDayNumber.textContent=d.getDate()}
-updateClock();setInterval(updateClock,1000);
-function createCategoryBadges(keys,container){container.innerHTML="";(keys||[]).forEach(k=>{const c=categoryInfo(k),b=document.createElement("span");b.className="category-badge";b.textContent=`${c.icon} ${c.name}`;b.style.color=c.color;b.style.border=`1px solid ${c.color}`;container.appendChild(b)})}
-function createEventCard(event){const mainCat=categoryInfo(event.categories[0]);const card=document.createElement("div");card.className="event-card";card.style.setProperty("--category-color",mainCat.color);const time=document.createElement("div");time.className="event-time";time.textContent=`${event.startTime} - ${event.endTime}`;const title=document.createElement("span");title.className="event-title";title.textContent=event.title;const loc=document.createElement("span");loc.className="event-location";loc.textContent=event.location?`📍 ${event.location}`:"📍 ไม่ได้ระบุสถานที่";card.append(time,title,loc);event.categories.slice(0,3).forEach(k=>{const c=categoryInfo(k),b=document.createElement("span");b.className="category-mini";b.style.setProperty("--category-color",c.color);b.textContent=`${c.icon} ${c.name}`;card.appendChild(b)});card.addEventListener("click",()=>openEventDetail(event.id));return card}
-function createTaskCard(task){const card=document.createElement("div");card.className="task-card";const check=document.createElement("button");check.type="button";check.className="task-check"+(task.completed?" completed":"");check.textContent=task.completed?"✓":"";check.addEventListener("click",e=>{e.stopPropagation();task.completed=!task.completed;saveAll();renderEverything()});const main=document.createElement("div");main.className="task-main";const title=document.createElement("span");title.className="task-name"+(task.completed?" completed":"");title.textContent=task.title;const meta=document.createElement("div");meta.className="task-meta";const d=document.createElement("span");d.textContent="📅 "+dateFromKey(task.date).toLocaleDateString("th-TH",{day:"numeric",month:"short"});const cats=document.createElement("span");cats.textContent=task.categories.slice(0,2).map(k=>categoryInfo(k).icon+" "+categoryInfo(k).name).join(" / ");const p=document.createElement("span");p.textContent=priorityName(task.priority);if(task.priority==="urgent")p.className="priority-urgent";if(task.priority==="high")p.className="priority-high";meta.append(d,cats,p);main.append(title,meta);main.addEventListener("click",()=>openTaskDetail(task.id));card.append(check,main);return card}
-function renderToday(){const key=formatDateKey(new Date());todayEventList.innerHTML="";const ev=events.filter(e=>e.date===key).sort((a,b)=>a.startTime.localeCompare(b.startTime));if(!ev.length)todayEventList.appendChild(emptyMessage("วันนี้ยังไม่มีนัดหมาย"));else ev.forEach(e=>todayEventList.appendChild(createEventCard(e)));todayTaskList.innerHTML="";const ts=tasks.filter(t=>t.date===key);todayTaskSummary.textContent=`${ts.filter(t=>t.completed).length} / ${ts.length} งานเสร็จแล้ว`;if(!ts.length)todayTaskList.appendChild(emptyMessage("วันนี้ยังไม่มีงาน"));else ts.forEach(t=>todayTaskList.appendChild(createTaskCard(t)));renderNextEvent()}
-function renderNextEvent(){nextEvent.innerHTML="";const now=new Date();const future=events.map(event=>({event,dt:new Date(`${event.date}T${event.startTime}:00`)})).filter(x=>x.dt>now).sort((a,b)=>a.dt-b.dt);if(!future.length){nextEvent.appendChild(emptyMessage("ยังไม่มีนัดหมายถัดไป"));return}const e=future[0].event,card=document.createElement("div");card.className="next-card";const s=document.createElement("strong");s.textContent=e.title;const sm=document.createElement("small");sm.textContent=`${thaiDate(e.date)} • ${e.startTime}`;card.append(s,sm);card.addEventListener("click",()=>openEventDetail(e.id));nextEvent.appendChild(card)}
-function renderCalendar(){calendar.innerHTML="";const months=["มกราคม","กุมภาพันธ์","มีนาคม","เมษายน","พฤษภาคม","มิถุนายน","กรกฎาคม","สิงหาคม","กันยายน","ตุลาคม","พฤศจิกายน","ธันวาคม"],days=["อา","จ","อ","พ","พฤ","ศ","ส"];monthTitle.textContent=`${months[currentMonth]} ${currentYear+543}`;days.forEach(day=>{const el=document.createElement("div");el.className="day-name";el.textContent=day;calendar.appendChild(el)});const first=new Date(currentYear,currentMonth,1).getDay(),count=new Date(currentYear,currentMonth+1,0).getDate();for(let i=0;i<first;i++)calendar.appendChild(document.createElement("div"));const real=new Date();for(let day=1;day<=count;day++){const el=document.createElement("div"),date=new Date(currentYear,currentMonth,day),key=formatDateKey(date);el.className="calendar-day";el.textContent=day;if(day===real.getDate()&&currentMonth===real.getMonth()&&currentYear===real.getFullYear())el.classList.add("today");if(day===selectedDate.getDate()&&currentMonth===selectedDate.getMonth()&&currentYear===selectedDate.getFullYear())el.classList.add("selected");const dayCats=[...new Set(events.filter(e=>e.date===key).flatMap(e=>e.categories))].slice(0,3);if(dayCats.length){const dots=document.createElement("div");dots.className="event-dots";dayCats.forEach(k=>{const dot=document.createElement("span");dot.className="event-dot";dot.style.background=categoryInfo(k).color;dots.appendChild(dot)});el.appendChild(dots)}el.addEventListener("click",()=>{selectedDate=date;renderCalendar();renderSelectedDate()});calendar.appendChild(el)}}
-function renderSelectedDate(){const key=formatDateKey(selectedDate);appointmentTitle.textContent="นัดหมาย • "+selectedDate.toLocaleDateString("th-TH",{weekday:"long",day:"numeric",month:"long"});eventList.innerHTML="";const ev=events.filter(e=>e.date===key).sort((a,b)=>a.startTime.localeCompare(b.startTime));if(!ev.length)eventList.appendChild(emptyMessage("ไม่มีนัดหมาย"));else ev.forEach(e=>eventList.appendChild(createEventCard(e)));calendarTaskList.innerHTML="";const ts=tasks.filter(t=>t.date===key);if(!ts.length)calendarTaskList.appendChild(emptyMessage("ไม่มีงาน"));else ts.forEach(t=>calendarTaskList.appendChild(createTaskCard(t)))}
-function renderTaskPage(){allTaskList.innerHTML="";const today=formatDateKey(new Date());let list=[...tasks];if(taskFilter==="pending")list=list.filter(t=>!t.completed);if(taskFilter==="today")list=list.filter(t=>t.date===today);if(taskFilter==="done")list=list.filter(t=>t.completed);list.sort((a,b)=>a.completed!==b.completed?(a.completed?1:-1):a.date.localeCompare(b.date));if(!list.length){allTaskList.appendChild(emptyMessage("ยังไม่มีงานในรายการนี้"));return}list.forEach(t=>allTaskList.appendChild(createTaskCard(t)))}
-const eventModal=$("event-modal"),eventDetailModal=$("event-detail-modal"),taskModal=$("task-modal"),taskDetailModal=$("task-detail-modal"),eventTitle=$("event-title"),eventDate=$("event-date"),eventStart=$("event-start-time"),eventEnd=$("event-end-time"),eventLocation=$("event-location"),eventNote=$("event-note"),taskTitle=$("task-title"),taskDate=$("task-date"),taskNote=$("task-note");
-function openAddEvent(date=selectedDate){editingEventId=null;$("event-form-title").textContent="เพิ่มนัดหมาย";eventTitle.value="";setChecks("event-categories",["personal"]);eventDate.value=formatDateKey(date);eventStart.value="09:00";eventEnd.value="10:00";eventLocation.value="";setChecks("event-reminders",[30]);eventNote.value="";eventModal.classList.add("show")}
-function openEditEvent(id){const e=events.find(x=>x.id===id);if(!e)return;editingEventId=id;$("event-form-title").textContent="แก้ไขนัดหมาย";eventTitle.value=e.title;setChecks("event-categories",e.categories);eventDate.value=e.date;eventStart.value=e.startTime;eventEnd.value=e.endTime;eventLocation.value=e.location;setChecks("event-reminders",e.reminders);eventNote.value=e.note;eventDetailModal.classList.remove("show");eventModal.classList.add("show")}
-function saveEvent(){const title=eventTitle.value.trim(),cats=getChecks("event-categories"),reminders=getChecks("event-reminders").map(Number),date=eventDate.value,startTime=eventStart.value,endTime=eventEnd.value;if(!title||!cats.length||!date||!startTime||!endTime){alert("กรุณากรอกชื่อ เลือกประเภท วันที่ และเวลาให้ครบ");return}if(endTime<startTime){alert("เวลาสิ้นสุดต้องไม่ก่อนเวลาเริ่ม");return}const data={title,categories:cats,reminders,date,startTime,endTime,location:eventLocation.value.trim(),note:eventNote.value.trim()};if(editingEventId!==null){const i=events.findIndex(x=>x.id===editingEventId);if(i!==-1)events[i]={...events[i],...data}}else events.push({id:Date.now(),...data});selectedDate=dateFromKey(date);currentMonth=selectedDate.getMonth();currentYear=selectedDate.getFullYear();saveAll();eventModal.classList.remove("show");renderEverything();checkDueReminders()}
-function reminderText(values){if(!values?.length)return"ไม่ตั้งแจ้งเตือน";return values.sort((a,b)=>a-b).map(v=>v===1440?"1 วันก่อน":v===60?"1 ชั่วโมงก่อน":`${v} นาทีก่อน`).join(", ")}
-function openEventDetail(id){const e=events.find(x=>x.id===id);if(!e)return;selectedEventId=id;createCategoryBadges(e.categories,$("detail-event-categories"));$("detail-event-title").textContent=e.title;$("detail-event-date").textContent=thaiDate(e.date);$("detail-event-time").textContent=`${e.startTime} - ${e.endTime}`;$("detail-event-location").textContent=e.location||"ไม่ได้ระบุสถานที่";$("detail-event-reminders").textContent=reminderText(e.reminders);$("detail-event-note").textContent=e.note||"ไม่มีรายละเอียดเพิ่มเติม";eventDetailModal.classList.add("show")}
-function openAddTask(date=selectedDate){editingTaskId=null;$("task-form-title").textContent="เพิ่มงาน";taskTitle.value="";setChecks("task-categories",["personal"]);taskDate.value=formatDateKey(date);setChecks("task-priority",["normal"]);taskNote.value="";taskModal.classList.add("show")}
-function openEditTask(id){const t=tasks.find(x=>x.id===id);if(!t)return;editingTaskId=id;$("task-form-title").textContent="แก้ไขงาน";taskTitle.value=t.title;setChecks("task-categories",t.categories);taskDate.value=t.date;setChecks("task-priority",[t.priority]);taskNote.value=t.note;taskDetailModal.classList.remove("show");taskModal.classList.add("show")}
-function saveTask(){const title=taskTitle.value.trim(),cats=getChecks("task-categories"),priority=getSingleCheck("task-priority"),date=taskDate.value;if(!title||!cats.length||!priority||!date){alert("กรุณากรอกชื่องาน เลือกประเภท ความสำคัญ และวันที่");return}const data={title,categories:cats,date,priority,note:taskNote.value.trim()};if(editingTaskId!==null){const i=tasks.findIndex(x=>x.id===editingTaskId);if(i!==-1)tasks[i]={...tasks[i],...data}}else tasks.push({id:Date.now(),completed:false,...data});saveAll();taskModal.classList.remove("show");renderEverything()}
-function openTaskDetail(id){const t=tasks.find(x=>x.id===id);if(!t)return;selectedTaskId=id;createCategoryBadges(t.categories,$("detail-task-categories"));$("detail-task-title").textContent=t.title;$("detail-task-date").textContent=thaiDate(t.date);$("detail-task-priority").textContent=priorityName(t.priority);$("detail-task-note").textContent=t.note||"ไม่มีรายละเอียดเพิ่มเติม";const c=$("complete-task");c.textContent=t.completed?"↩ กลับเป็นยังไม่เสร็จ":"✓ ทำเสร็จแล้ว";c.classList.toggle("done",t.completed);taskDetailModal.classList.add("show")}
-function createCategoryBadges(keys,container){container.innerHTML="";(keys||[]).forEach(k=>{const c=categoryInfo(k),b=document.createElement("span");b.className="category-badge";b.textContent=`${c.icon} ${c.name}`;b.style.color=c.color;b.style.border=`1px solid ${c.color}`;container.appendChild(b)})}
-function renderEverything(){renderToday();renderCalendar();renderSelectedDate();renderTaskPage();updateNotificationStatus()}
-document.querySelectorAll(".nav-btn").forEach(btn=>btn.addEventListener("click",()=>{document.querySelectorAll(".page").forEach(p=>p.classList.remove("active"));document.querySelectorAll(".nav-btn").forEach(n=>n.classList.remove("active"));$(btn.dataset.page).classList.add("active");btn.classList.add("active")}));
-prevMonth.addEventListener("click",()=>{if(--currentMonth<0){currentMonth=11;currentYear--}renderCalendar()});nextMonth.addEventListener("click",()=>{if(++currentMonth>11){currentMonth=0;currentYear++}renderCalendar()});
-$("today-add-event").addEventListener("click",()=>openAddEvent(new Date()));$("calendar-add-event").addEventListener("click",()=>openAddEvent(selectedDate));$("today-add-task").addEventListener("click",()=>openAddTask(new Date()));$("calendar-add-task").addEventListener("click",()=>openAddTask(selectedDate));$("task-add-button").addEventListener("click",()=>openAddTask(new Date()));$("save-event").addEventListener("click",saveEvent);$("save-task").addEventListener("click",saveTask);
-$("edit-event").addEventListener("click",()=>selectedEventId!==null&&openEditEvent(selectedEventId));$("delete-event").addEventListener("click",()=>{const e=events.find(x=>x.id===selectedEventId);if(!e||!confirm(`ต้องการลบนัด "${e.title}" ใช่หรือไม่?`))return;events=events.filter(x=>x.id!==selectedEventId);selectedEventId=null;saveAll();eventDetailModal.classList.remove("show");renderEverything()});
-$("edit-task").addEventListener("click",()=>selectedTaskId!==null&&openEditTask(selectedTaskId));$("delete-task").addEventListener("click",()=>{const t=tasks.find(x=>x.id===selectedTaskId);if(!t||!confirm(`ต้องการลบงาน "${t.title}" ใช่หรือไม่?`))return;tasks=tasks.filter(x=>x.id!==selectedTaskId);selectedTaskId=null;saveAll();taskDetailModal.classList.remove("show");renderEverything()});$("complete-task").addEventListener("click",()=>{const t=tasks.find(x=>x.id===selectedTaskId);if(!t)return;t.completed=!t.completed;saveAll();taskDetailModal.classList.remove("show");renderEverything()});
-document.querySelectorAll(".filter-btn").forEach(btn=>btn.addEventListener("click",()=>{taskFilter=btn.dataset.filter;document.querySelectorAll(".filter-btn").forEach(x=>x.classList.remove("active"));btn.classList.add("active");renderTaskPage()}));
-function closeModal(m){m.classList.remove("show")}[[$("close-event-form"),eventModal],[$("close-event-detail"),eventDetailModal],[$("close-task-form"),taskModal],[$("close-task-detail"),taskDetailModal]].forEach(([b,m])=>b.addEventListener("click",()=>closeModal(m)));[eventModal,eventDetailModal,taskModal,taskDetailModal].forEach(m=>m.addEventListener("click",e=>{if(e.target===m)closeModal(m)}));
 
-// PWA + NOTIFICATIONS
-let swRegistration=null;
-async function registerServiceWorker(){if(!("serviceWorker" in navigator))return;try{swRegistration=await navigator.serviceWorker.register("./sw.js");await navigator.serviceWorker.ready}catch(err){console.error("Service worker:",err)}}
-function updateNotificationStatus(){if(!("Notification" in window)){notificationStatus.textContent="เบราว์เซอร์นี้ไม่รองรับ Notification";return}if(Notification.permission==="granted")notificationStatus.textContent="เปิดแล้ว • พร้อมรับการแจ้งเตือน";else if(Notification.permission==="denied")notificationStatus.textContent="ถูกปฏิเสธ • ต้องเปิดสิทธิ์จาก Settings";else notificationStatus.textContent="ยังไม่ได้เปิดการแจ้งเตือน"}
-async function enableNotifications(){if(!("Notification" in window)){alert("อุปกรณ์นี้ยังไม่รองรับ Notification API");return}const permission=await Notification.requestPermission();updateNotificationStatus();if(permission==="granted")await showNotification("My Planner","เปิดการแจ้งเตือนเรียบร้อยแล้ว","planner-enabled")}
-async function showNotification(title,body,tag="planner"){if(Notification.permission!=="granted")return;const reg=swRegistration||await navigator.serviceWorker.ready;await reg.showNotification(title,{body,tag,icon:"./icon.svg",badge:"./icon.svg",data:{url:"./"}})}
-$("enable-notifications").addEventListener("click",enableNotifications);$("test-notification").addEventListener("click",async()=>{if(Notification.permission!=="granted"){alert("กด 'เปิดแจ้งเตือน' ก่อนครับ");return}await showNotification("ทดสอบ My Planner","ถ้าเห็นข้อความนี้ แปลว่าการแจ้งเตือนทำงานแล้ว","planner-test-"+Date.now())});
-function notificationKey(eventId,offset){return `planner-notified-${eventId}-${offset}`}
-async function checkDueReminders(){if(Notification.permission!=="granted")return;const now=Date.now();for(const e of events){const start=new Date(`${e.date}T${e.startTime}:00`).getTime();for(const offset of e.reminders||[]){const due=start-offset*60000,key=notificationKey(e.id,offset);if(now>=due&&now-due<120000&&!localStorage.getItem(key)){localStorage.setItem(key,"1");await showNotification(e.title,`${reminderText([offset])} • ${e.startTime}${e.location?" • "+e.location:""}`,key)}}}}
-setInterval(checkDueReminders,30000);
+function setSyncState(text, state = "busy") {
+  syncStatus.textContent = text;
+  syncDot.className = `sync-dot ${state}`;
+}
 
-// Export .ics so iPhone/Apple Calendar can own the reminder even when PWA is closed.
-function pad2(n){return String(n).padStart(2,"0")}
-function icsLocalDate(dateKey,time){const [y,m,d]=dateKey.split("-").map(Number),[h,min]=time.split(":").map(Number);return `${y}${pad2(m)}${pad2(d)}T${pad2(h)}${pad2(min)}00`}
-function escapeICS(s=""){return s.replace(/\\/g,"\\\\").replace(/\n/g,"\\n").replace(/,/g,"\\,").replace(/;/g,"\\;")}
-function exportEventICS(event){let alarms="";(event.reminders||[]).forEach(min=>{alarms+=`BEGIN:VALARM\r\nTRIGGER:-PT${min}M\r\nACTION:DISPLAY\r\nDESCRIPTION:${escapeICS(event.title)}\r\nEND:VALARM\r\n`});const ics=`BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//My Planner//TH\r\nCALSCALE:GREGORIAN\r\nBEGIN:VEVENT\r\nUID:${event.id}@my-planner\r\nDTSTAMP:${new Date().toISOString().replace(/[-:]/g,"").replace(/\.\d{3}Z/,"Z")}\r\nDTSTART:${icsLocalDate(event.date,event.startTime)}\r\nDTEND:${icsLocalDate(event.date,event.endTime)}\r\nSUMMARY:${escapeICS(event.title)}\r\nLOCATION:${escapeICS(event.location)}\r\nDESCRIPTION:${escapeICS(event.note)}\r\n${alarms}END:VEVENT\r\nEND:VCALENDAR\r\n`;const blob=new Blob([ics],{type:"text/calendar;charset=utf-8"}),url=URL.createObjectURL(blob),a=document.createElement("a");a.href=url;a.download=`my-planner-${event.date}.ics`;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000)}
-$("export-calendar").addEventListener("click",()=>{const e=events.find(x=>x.id===selectedEventId);if(e)exportEventICS(e)});
+function userCollection(name) {
+  if (!currentUser) throw new Error("ยังไม่ได้เข้าสู่ระบบ");
+  return collection(db, "users", currentUser.uid, name);
+}
 
-registerServiceWorker().then(()=>{updateNotificationStatus();checkDueReminders()});saveAll();renderEverything();
+function userDoc(name, id) {
+  if (!currentUser) throw new Error("ยังไม่ได้เข้าสู่ระบบ");
+  return doc(db, "users", currentUser.uid, name, String(id));
+}
+
+function firestoreEventData(event) {
+  return {
+    title: event.title,
+    categories: event.categories,
+    reminders: event.reminders,
+    date: event.date,
+    startTime: event.startTime,
+    endTime: event.endTime,
+    location: event.location || "",
+    note: event.note || "",
+    updatedAt: serverTimestamp()
+  };
+}
+
+function firestoreTaskData(task) {
+  return {
+    title: task.title,
+    categories: task.categories,
+    priority: task.priority,
+    completed: Boolean(task.completed),
+    date: task.date,
+    note: task.note || "",
+    updatedAt: serverTimestamp()
+  };
+}
+
+// =========================================================
+// AUTH + FIRESTORE SYNC
+// =========================================================
+
+function authErrorMessage(error) {
+  const code = error?.code || "";
+  if (code.includes("invalid-credential") || code.includes("wrong-password") || code.includes("user-not-found")) {
+    return "อีเมลหรือรหัสผ่านไม่ถูกต้อง";
+  }
+  if (code.includes("too-many-requests")) return "ลองเข้าสู่ระบบหลายครั้งเกินไป กรุณารอสักครู่";
+  if (code.includes("network-request-failed")) return "เชื่อมต่ออินเทอร์เน็ตไม่ได้";
+  return "เข้าสู่ระบบไม่สำเร็จ กรุณาลองใหม่";
+}
+
+async function handleLogin() {
+  const email = loginEmail.value.trim();
+  const password = loginPassword.value;
+
+  if (!email || !password) {
+    loginError.textContent = "กรุณากรอกอีเมลและรหัสผ่าน";
+    return;
+  }
+
+  loginError.textContent = "";
+  loginButton.disabled = true;
+  loginButton.textContent = "กำลังเข้าสู่ระบบ...";
+
+  try {
+    await authPersistenceReady;
+    await signInWithEmailAndPassword(auth, email, password);
+    loginPassword.value = "";
+  } catch (error) {
+    console.error(error);
+    loginError.textContent = authErrorMessage(error);
+  } finally {
+    loginButton.disabled = false;
+    loginButton.textContent = "เข้าสู่ระบบ";
+  }
+}
+
+loginButton.addEventListener("click", handleLogin);
+loginPassword.addEventListener("keydown", event => {
+  if (event.key === "Enter") handleLogin();
+});
+
+logoutButton.addEventListener("click", async () => {
+  if (!confirm("ต้องการออกจากระบบ My Planner ใช่หรือไม่?")) return;
+  await signOut(auth);
+});
+
+async function migrateLocalData(user) {
+  const migrationKey = `planner-cloud-migrated-v1-${user.uid}`;
+  if (localStorage.getItem(migrationKey)) return;
+
+  const localEvents = normalizeEvents(JSON.parse(localStorage.getItem("planner-events") || "[]"));
+  const localTasks = normalizeTasks(JSON.parse(localStorage.getItem("planner-tasks") || "[]"));
+
+  if (!localEvents.length && !localTasks.length) {
+    localStorage.setItem(migrationKey, "1");
+    return;
+  }
+
+  setSyncState("กำลังย้ายข้อมูลเดิมขึ้น Cloud...", "busy");
+
+  const writes = [];
+
+  localEvents.forEach(event => {
+    const id = String(event.id || makeId("event"));
+    writes.push(setDoc(userDoc("events", id), firestoreEventData(event), { merge: true }));
+  });
+
+  localTasks.forEach(task => {
+    const id = String(task.id || makeId("task"));
+    writes.push(setDoc(userDoc("tasks", id), firestoreTaskData(task), { merge: true }));
+  });
+
+  await Promise.all(writes);
+  localStorage.setItem(migrationKey, "1");
+}
+
+function stopCloudListeners() {
+  if (unsubscribeEvents) unsubscribeEvents();
+  if (unsubscribeTasks) unsubscribeTasks();
+  unsubscribeEvents = null;
+  unsubscribeTasks = null;
+}
+
+function startCloudListeners() {
+  stopCloudListeners();
+  setSyncState("กำลังซิงก์ข้อมูล...", "busy");
+
+  unsubscribeEvents = onSnapshot(
+    userCollection("events"),
+    snapshot => {
+      events = normalizeEvents(snapshot.docs.map(snapshotDoc => ({
+        id: snapshotDoc.id,
+        ...snapshotDoc.data()
+      })));
+      saveLocalBackup();
+      renderEverything();
+      setSyncState(navigator.onLine ? "ซิงก์แล้ว" : "ออฟไลน์ • ใช้ข้อมูลล่าสุด", navigator.onLine ? "online" : "busy");
+    },
+    error => {
+      console.error("Events sync error:", error);
+      setSyncState("ซิงก์นัดหมายไม่สำเร็จ", "error");
+    }
+  );
+
+  unsubscribeTasks = onSnapshot(
+    userCollection("tasks"),
+    snapshot => {
+      tasks = normalizeTasks(snapshot.docs.map(snapshotDoc => ({
+        id: snapshotDoc.id,
+        ...snapshotDoc.data()
+      })));
+      saveLocalBackup();
+      renderEverything();
+      setSyncState(navigator.onLine ? "ซิงก์แล้ว" : "ออฟไลน์ • ใช้ข้อมูลล่าสุด", navigator.onLine ? "online" : "busy");
+    },
+    error => {
+      console.error("Tasks sync error:", error);
+      setSyncState("ซิงก์งานไม่สำเร็จ", "error");
+    }
+  );
+}
+
+onAuthStateChanged(auth, async user => {
+  stopCloudListeners();
+  currentUser = user;
+
+  if (!user) {
+    syncUser.textContent = "ยังไม่ได้เข้าสู่ระบบ";
+    setSyncState("ยังไม่ได้เชื่อม Cloud", "busy");
+    loginScreen.classList.remove("hidden");
+    return;
+  }
+
+  syncUser.textContent = user.email || "บัญชี Firebase";
+  loginEmail.value = user.email || loginEmail.value;
+  loginError.textContent = "";
+  loginScreen.classList.add("hidden");
+
+  try {
+    await migrateLocalData(user);
+    startCloudListeners();
+  } catch (error) {
+    console.error("Cloud startup error:", error);
+    setSyncState("เชื่อม Cloud ไม่สำเร็จ", "error");
+    alert("เชื่อม Firebase ไม่สำเร็จ กรุณาตรวจ Firestore Rules และอินเทอร์เน็ต");
+  }
+});
+
+window.addEventListener("online", () => {
+  if (currentUser) setSyncState("ออนไลน์ • กำลังตรวจสอบข้อมูล...", "busy");
+});
+
+window.addEventListener("offline", () => {
+  if (currentUser) setSyncState("ออฟไลน์ • ใช้ข้อมูลล่าสุด", "busy");
+});
+
+// =========================================================
+// CLOCK
+// =========================================================
+
+function updateClock() {
+  const date = new Date();
+  timeText.textContent = `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}:${String(date.getSeconds()).padStart(2, "0")}`;
+  todayText.textContent = date.toLocaleDateString("th-TH", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric"
+  });
+  todayHeading.textContent = date.toLocaleDateString("th-TH", {
+    weekday: "long",
+    month: "long"
+  });
+  todayDayNumber.textContent = date.getDate();
+}
+
+updateClock();
+setInterval(updateClock, 1000);
+
+// =========================================================
+// UI COMPONENTS
+// =========================================================
+
+function createCategoryBadges(keys, container) {
+  container.innerHTML = "";
+  (keys || []).forEach(key => {
+    const category = categoryInfo(key);
+    const badge = document.createElement("span");
+    badge.className = "category-badge";
+    badge.textContent = `${category.icon} ${category.name}`;
+    badge.style.color = category.color;
+    badge.style.border = `1px solid ${category.color}`;
+    container.appendChild(badge);
+  });
+}
+
+function createEventCard(event) {
+  const mainCategory = categoryInfo(event.categories[0]);
+  const card = document.createElement("div");
+  card.className = "event-card";
+  card.style.setProperty("--category-color", mainCategory.color);
+
+  const time = document.createElement("div");
+  time.className = "event-time";
+  time.textContent = `${event.startTime} - ${event.endTime}`;
+
+  const title = document.createElement("span");
+  title.className = "event-title";
+  title.textContent = event.title;
+
+  const location = document.createElement("span");
+  location.className = "event-location";
+  location.textContent = event.location ? `📍 ${event.location}` : "📍 ไม่ได้ระบุสถานที่";
+
+  card.append(time, title, location);
+
+  event.categories.slice(0, 3).forEach(key => {
+    const category = categoryInfo(key);
+    const badge = document.createElement("span");
+    badge.className = "category-mini";
+    badge.style.setProperty("--category-color", category.color);
+    badge.textContent = `${category.icon} ${category.name}`;
+    card.appendChild(badge);
+  });
+
+  card.addEventListener("click", () => openEventDetail(event.id));
+  return card;
+}
+
+function createTaskCard(task) {
+  const card = document.createElement("div");
+  card.className = "task-card";
+
+  const check = document.createElement("button");
+  check.type = "button";
+  check.className = `task-check${task.completed ? " completed" : ""}`;
+  check.textContent = task.completed ? "✓" : "";
+
+  check.addEventListener("click", async event => {
+    event.stopPropagation();
+    if (!currentUser) return;
+
+    try {
+      setSyncState("กำลังบันทึก...", "busy");
+      await setDoc(userDoc("tasks", task.id), firestoreTaskData({
+        ...task,
+        completed: !task.completed
+      }), { merge: true });
+    } catch (error) {
+      console.error(error);
+      setSyncState("บันทึกไม่สำเร็จ", "error");
+      alert("เปลี่ยนสถานะงานไม่สำเร็จ");
+    }
+  });
+
+  const main = document.createElement("div");
+  main.className = "task-main";
+
+  const title = document.createElement("span");
+  title.className = `task-name${task.completed ? " completed" : ""}`;
+  title.textContent = task.title;
+
+  const meta = document.createElement("div");
+  meta.className = "task-meta";
+
+  const date = document.createElement("span");
+  date.textContent = "📅 " + dateFromKey(task.date).toLocaleDateString("th-TH", {
+    day: "numeric",
+    month: "short"
+  });
+
+  const taskCategories = document.createElement("span");
+  taskCategories.textContent = task.categories
+    .slice(0, 2)
+    .map(key => `${categoryInfo(key).icon} ${categoryInfo(key).name}`)
+    .join(" / ");
+
+  const priority = document.createElement("span");
+  priority.textContent = priorityName(task.priority);
+  if (task.priority === "urgent") priority.className = "priority-urgent";
+  if (task.priority === "high") priority.className = "priority-high";
+
+  meta.append(date, taskCategories, priority);
+  main.append(title, meta);
+  main.addEventListener("click", () => openTaskDetail(task.id));
+  card.append(check, main);
+
+  return card;
+}
+
+// =========================================================
+// RENDER
+// =========================================================
+
+function renderToday() {
+  const key = formatDateKey(new Date());
+
+  todayEventList.innerHTML = "";
+  const dayEvents = events
+    .filter(event => event.date === key)
+    .sort((a, b) => a.startTime.localeCompare(b.startTime));
+
+  if (!dayEvents.length) {
+    todayEventList.appendChild(emptyMessage("วันนี้ยังไม่มีนัดหมาย"));
+  } else {
+    dayEvents.forEach(event => todayEventList.appendChild(createEventCard(event)));
+  }
+
+  todayTaskList.innerHTML = "";
+  const dayTasks = tasks.filter(task => task.date === key);
+  todayTaskSummary.textContent = `${dayTasks.filter(task => task.completed).length} / ${dayTasks.length} งานเสร็จแล้ว`;
+
+  if (!dayTasks.length) {
+    todayTaskList.appendChild(emptyMessage("วันนี้ยังไม่มีงาน"));
+  } else {
+    dayTasks.forEach(task => todayTaskList.appendChild(createTaskCard(task)));
+  }
+
+  renderNextEvent();
+}
+
+function renderNextEvent() {
+  nextEvent.innerHTML = "";
+  const now = new Date();
+  const future = events
+    .map(event => ({
+      event,
+      datetime: new Date(`${event.date}T${event.startTime}:00`)
+    }))
+    .filter(item => item.datetime > now)
+    .sort((a, b) => a.datetime - b.datetime);
+
+  if (!future.length) {
+    nextEvent.appendChild(emptyMessage("ยังไม่มีนัดหมายถัดไป"));
+    return;
+  }
+
+  const event = future[0].event;
+  const card = document.createElement("div");
+  card.className = "next-card";
+
+  const title = document.createElement("strong");
+  title.textContent = event.title;
+
+  const detail = document.createElement("small");
+  detail.textContent = `${thaiDate(event.date)} • ${event.startTime}`;
+
+  card.append(title, detail);
+  card.addEventListener("click", () => openEventDetail(event.id));
+  nextEvent.appendChild(card);
+}
+
+function renderCalendar() {
+  calendar.innerHTML = "";
+  const months = [
+    "มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน",
+    "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"
+  ];
+  const days = ["อา", "จ", "อ", "พ", "พฤ", "ศ", "ส"];
+
+  monthTitle.textContent = `${months[currentMonth]} ${currentYear + 543}`;
+
+  days.forEach(day => {
+    const element = document.createElement("div");
+    element.className = "day-name";
+    element.textContent = day;
+    calendar.appendChild(element);
+  });
+
+  const firstDay = new Date(currentYear, currentMonth, 1).getDay();
+  const dayCount = new Date(currentYear, currentMonth + 1, 0).getDate();
+
+  for (let i = 0; i < firstDay; i += 1) {
+    calendar.appendChild(document.createElement("div"));
+  }
+
+  const realToday = new Date();
+
+  for (let day = 1; day <= dayCount; day += 1) {
+    const element = document.createElement("div");
+    const date = new Date(currentYear, currentMonth, day);
+    const key = formatDateKey(date);
+
+    element.className = "calendar-day";
+    element.textContent = day;
+
+    if (
+      day === realToday.getDate() &&
+      currentMonth === realToday.getMonth() &&
+      currentYear === realToday.getFullYear()
+    ) {
+      element.classList.add("today");
+    }
+
+    if (
+      day === selectedDate.getDate() &&
+      currentMonth === selectedDate.getMonth() &&
+      currentYear === selectedDate.getFullYear()
+    ) {
+      element.classList.add("selected");
+    }
+
+    const dayCategories = [...new Set(
+      events
+        .filter(event => event.date === key)
+        .flatMap(event => event.categories)
+    )].slice(0, 3);
+
+    if (dayCategories.length) {
+      const dots = document.createElement("div");
+      dots.className = "event-dots";
+
+      dayCategories.forEach(categoryKey => {
+        const dot = document.createElement("span");
+        dot.className = "event-dot";
+        dot.style.background = categoryInfo(categoryKey).color;
+        dots.appendChild(dot);
+      });
+
+      element.appendChild(dots);
+    }
+
+    element.addEventListener("click", () => {
+      selectedDate = date;
+      renderCalendar();
+      renderSelectedDate();
+    });
+
+    calendar.appendChild(element);
+  }
+}
+
+function renderSelectedDate() {
+  const key = formatDateKey(selectedDate);
+  appointmentTitle.textContent = "นัดหมาย • " + selectedDate.toLocaleDateString("th-TH", {
+    weekday: "long",
+    day: "numeric",
+    month: "long"
+  });
+
+  eventList.innerHTML = "";
+  const selectedEvents = events
+    .filter(event => event.date === key)
+    .sort((a, b) => a.startTime.localeCompare(b.startTime));
+
+  if (!selectedEvents.length) {
+    eventList.appendChild(emptyMessage("ไม่มีนัดหมาย"));
+  } else {
+    selectedEvents.forEach(event => eventList.appendChild(createEventCard(event)));
+  }
+
+  calendarTaskList.innerHTML = "";
+  const selectedTasks = tasks.filter(task => task.date === key);
+
+  if (!selectedTasks.length) {
+    calendarTaskList.appendChild(emptyMessage("ไม่มีงาน"));
+  } else {
+    selectedTasks.forEach(task => calendarTaskList.appendChild(createTaskCard(task)));
+  }
+}
+
+function renderTaskPage() {
+  allTaskList.innerHTML = "";
+  const todayKey = formatDateKey(new Date());
+  let list = [...tasks];
+
+  if (taskFilter === "pending") list = list.filter(task => !task.completed);
+  if (taskFilter === "today") list = list.filter(task => task.date === todayKey);
+  if (taskFilter === "done") list = list.filter(task => task.completed);
+
+  list.sort((a, b) => {
+    if (a.completed !== b.completed) return a.completed ? 1 : -1;
+    return a.date.localeCompare(b.date);
+  });
+
+  if (!list.length) {
+    allTaskList.appendChild(emptyMessage("ยังไม่มีงานในรายการนี้"));
+    return;
+  }
+
+  list.forEach(task => allTaskList.appendChild(createTaskCard(task)));
+}
+
+function renderEverything() {
+  renderToday();
+  renderCalendar();
+  renderSelectedDate();
+  renderTaskPage();
+  updateNotificationStatus();
+}
+
+// =========================================================
+// EVENT FORM / DETAIL
+// =========================================================
+
+const eventModal = $("event-modal");
+const eventDetailModal = $("event-detail-modal");
+const eventTitle = $("event-title");
+const eventDate = $("event-date");
+const eventStart = $("event-start-time");
+const eventEnd = $("event-end-time");
+const eventLocation = $("event-location");
+const eventNote = $("event-note");
+
+function openAddEvent(date = selectedDate) {
+  editingEventId = null;
+  $("event-form-title").textContent = "เพิ่มนัดหมาย";
+  eventTitle.value = "";
+  setChecks("event-categories", ["personal"]);
+  setChecks("event-reminders", []);
+  eventDate.value = formatDateKey(date);
+  eventStart.value = "09:00";
+  eventEnd.value = "10:00";
+  eventLocation.value = "";
+  eventNote.value = "";
+  eventModal.classList.add("show");
+}
+
+function openEditEvent(id) {
+  const event = events.find(item => item.id === String(id));
+  if (!event) return;
+
+  editingEventId = event.id;
+  $("event-form-title").textContent = "แก้ไขนัดหมาย";
+  eventTitle.value = event.title;
+  setChecks("event-categories", event.categories);
+  setChecks("event-reminders", event.reminders.map(String));
+  eventDate.value = event.date;
+  eventStart.value = event.startTime;
+  eventEnd.value = event.endTime;
+  eventLocation.value = event.location;
+  eventNote.value = event.note;
+  eventDetailModal.classList.remove("show");
+  eventModal.classList.add("show");
+}
+
+async function saveEvent() {
+  if (!currentUser) return;
+
+  const title = eventTitle.value.trim();
+  const eventCategories = getChecks("event-categories");
+  const reminders = getChecks("event-reminders").map(Number);
+  const date = eventDate.value;
+  const startTime = eventStart.value;
+  const endTime = eventEnd.value;
+
+  if (!title || !eventCategories.length || !date || !startTime || !endTime) {
+    alert("กรุณากรอกชื่อ เลือกประเภท วันที่ และเวลาให้ครบ");
+    return;
+  }
+
+  if (endTime < startTime) {
+    alert("เวลาสิ้นสุดต้องไม่ก่อนเวลาเริ่ม");
+    return;
+  }
+
+  const id = editingEventId || makeId("event");
+  const data = {
+    id,
+    title,
+    categories: eventCategories,
+    reminders,
+    date,
+    startTime,
+    endTime,
+    location: eventLocation.value.trim(),
+    note: eventNote.value.trim()
+  };
+
+  try {
+    setSyncState("กำลังบันทึกนัดหมาย...", "busy");
+    await setDoc(userDoc("events", id), firestoreEventData(data), { merge: true });
+
+    selectedDate = dateFromKey(date);
+    currentMonth = selectedDate.getMonth();
+    currentYear = selectedDate.getFullYear();
+    eventModal.classList.remove("show");
+    editingEventId = null;
+    checkDueReminders();
+  } catch (error) {
+    console.error(error);
+    setSyncState("บันทึกนัดหมายไม่สำเร็จ", "error");
+    alert("บันทึกนัดหมายไม่สำเร็จ กรุณาลองใหม่");
+  }
+}
+
+function reminderText(values) {
+  if (!values?.length) return "ไม่ตั้งแจ้งเตือน";
+  return [...values]
+    .sort((a, b) => a - b)
+    .map(value => value === 1440 ? "1 วันก่อน" : value === 60 ? "1 ชั่วโมงก่อน" : `${value} นาทีก่อน`)
+    .join(", ");
+}
+
+function openEventDetail(id) {
+  const event = events.find(item => item.id === String(id));
+  if (!event) return;
+
+  selectedEventId = event.id;
+  createCategoryBadges(event.categories, $("detail-event-categories"));
+  $("detail-event-title").textContent = event.title;
+  $("detail-event-date").textContent = thaiDate(event.date);
+  $("detail-event-time").textContent = `${event.startTime} - ${event.endTime}`;
+  $("detail-event-location").textContent = event.location || "ไม่ได้ระบุสถานที่";
+  $("detail-event-reminders").textContent = reminderText(event.reminders);
+  $("detail-event-note").textContent = event.note || "ไม่มีรายละเอียดเพิ่มเติม";
+  eventDetailModal.classList.add("show");
+}
+
+// =========================================================
+// TASK FORM / DETAIL
+// =========================================================
+
+const taskModal = $("task-modal");
+const taskDetailModal = $("task-detail-modal");
+const taskTitle = $("task-title");
+const taskDate = $("task-date");
+const taskNote = $("task-note");
+
+function openAddTask(date = selectedDate) {
+  editingTaskId = null;
+  $("task-form-title").textContent = "เพิ่มงาน";
+  taskTitle.value = "";
+  setChecks("task-categories", ["personal"]);
+  taskDate.value = formatDateKey(date);
+  setChecks("task-priority", ["normal"]);
+  taskNote.value = "";
+  taskModal.classList.add("show");
+}
+
+function openEditTask(id) {
+  const task = tasks.find(item => item.id === String(id));
+  if (!task) return;
+
+  editingTaskId = task.id;
+  $("task-form-title").textContent = "แก้ไขงาน";
+  taskTitle.value = task.title;
+  setChecks("task-categories", task.categories);
+  taskDate.value = task.date;
+  setChecks("task-priority", [task.priority]);
+  taskNote.value = task.note;
+  taskDetailModal.classList.remove("show");
+  taskModal.classList.add("show");
+}
+
+async function saveTask() {
+  if (!currentUser) return;
+
+  const title = taskTitle.value.trim();
+  const taskCategories = getChecks("task-categories");
+  const priority = getSingleCheck("task-priority");
+  const date = taskDate.value;
+
+  if (!title || !taskCategories.length || !priority || !date) {
+    alert("กรุณากรอกชื่องาน เลือกประเภท ความสำคัญ และวันที่");
+    return;
+  }
+
+  const id = editingTaskId || makeId("task");
+  const existing = tasks.find(item => item.id === id);
+  const data = {
+    id,
+    title,
+    categories: taskCategories,
+    date,
+    priority,
+    completed: existing ? existing.completed : false,
+    note: taskNote.value.trim()
+  };
+
+  try {
+    setSyncState("กำลังบันทึกงาน...", "busy");
+    await setDoc(userDoc("tasks", id), firestoreTaskData(data), { merge: true });
+    taskModal.classList.remove("show");
+    editingTaskId = null;
+  } catch (error) {
+    console.error(error);
+    setSyncState("บันทึกงานไม่สำเร็จ", "error");
+    alert("บันทึกงานไม่สำเร็จ กรุณาลองใหม่");
+  }
+}
+
+function openTaskDetail(id) {
+  const task = tasks.find(item => item.id === String(id));
+  if (!task) return;
+
+  selectedTaskId = task.id;
+  createCategoryBadges(task.categories, $("detail-task-categories"));
+  $("detail-task-title").textContent = task.title;
+  $("detail-task-date").textContent = thaiDate(task.date);
+  $("detail-task-priority").textContent = priorityName(task.priority);
+  $("detail-task-note").textContent = task.note || "ไม่มีรายละเอียดเพิ่มเติม";
+
+  const complete = $("complete-task");
+  complete.textContent = task.completed ? "↩ กลับเป็นยังไม่เสร็จ" : "✓ ทำเสร็จแล้ว";
+  complete.classList.toggle("done", task.completed);
+  taskDetailModal.classList.add("show");
+}
+
+// =========================================================
+// NAVIGATION + BUTTONS
+// =========================================================
+
+document.querySelectorAll(".nav-btn").forEach(button => {
+  button.addEventListener("click", () => {
+    document.querySelectorAll(".page").forEach(page => page.classList.remove("active"));
+    document.querySelectorAll(".nav-btn").forEach(nav => nav.classList.remove("active"));
+    $(button.dataset.page).classList.add("active");
+    button.classList.add("active");
+  });
+});
+
+prevMonth.addEventListener("click", () => {
+  currentMonth -= 1;
+  if (currentMonth < 0) {
+    currentMonth = 11;
+    currentYear -= 1;
+  }
+  renderCalendar();
+});
+
+nextMonth.addEventListener("click", () => {
+  currentMonth += 1;
+  if (currentMonth > 11) {
+    currentMonth = 0;
+    currentYear += 1;
+  }
+  renderCalendar();
+});
+
+$("today-add-event").addEventListener("click", () => openAddEvent(new Date()));
+$("calendar-add-event").addEventListener("click", () => openAddEvent(selectedDate));
+$("today-add-task").addEventListener("click", () => openAddTask(new Date()));
+$("calendar-add-task").addEventListener("click", () => openAddTask(selectedDate));
+$("task-add-button").addEventListener("click", () => openAddTask(new Date()));
+$("save-event").addEventListener("click", saveEvent);
+$("save-task").addEventListener("click", saveTask);
+
+$("edit-event").addEventListener("click", () => {
+  if (selectedEventId !== null) openEditEvent(selectedEventId);
+});
+
+$("delete-event").addEventListener("click", async () => {
+  const event = events.find(item => item.id === String(selectedEventId));
+  if (!event || !confirm(`ต้องการลบนัด "${event.title}" ใช่หรือไม่?`)) return;
+
+  try {
+    setSyncState("กำลังลบนัดหมาย...", "busy");
+    await deleteDoc(userDoc("events", event.id));
+    selectedEventId = null;
+    eventDetailModal.classList.remove("show");
+  } catch (error) {
+    console.error(error);
+    setSyncState("ลบนัดหมายไม่สำเร็จ", "error");
+    alert("ลบนัดหมายไม่สำเร็จ");
+  }
+});
+
+$("edit-task").addEventListener("click", () => {
+  if (selectedTaskId !== null) openEditTask(selectedTaskId);
+});
+
+$("delete-task").addEventListener("click", async () => {
+  const task = tasks.find(item => item.id === String(selectedTaskId));
+  if (!task || !confirm(`ต้องการลบงาน "${task.title}" ใช่หรือไม่?`)) return;
+
+  try {
+    setSyncState("กำลังลบงาน...", "busy");
+    await deleteDoc(userDoc("tasks", task.id));
+    selectedTaskId = null;
+    taskDetailModal.classList.remove("show");
+  } catch (error) {
+    console.error(error);
+    setSyncState("ลบงานไม่สำเร็จ", "error");
+    alert("ลบงานไม่สำเร็จ");
+  }
+});
+
+$("complete-task").addEventListener("click", async () => {
+  const task = tasks.find(item => item.id === String(selectedTaskId));
+  if (!task) return;
+
+  try {
+    setSyncState("กำลังบันทึก...", "busy");
+    await setDoc(userDoc("tasks", task.id), firestoreTaskData({
+      ...task,
+      completed: !task.completed
+    }), { merge: true });
+    taskDetailModal.classList.remove("show");
+  } catch (error) {
+    console.error(error);
+    setSyncState("บันทึกไม่สำเร็จ", "error");
+    alert("เปลี่ยนสถานะงานไม่สำเร็จ");
+  }
+});
+
+document.querySelectorAll(".filter-btn").forEach(button => {
+  button.addEventListener("click", () => {
+    taskFilter = button.dataset.filter;
+    document.querySelectorAll(".filter-btn").forEach(item => item.classList.remove("active"));
+    button.classList.add("active");
+    renderTaskPage();
+  });
+});
+
+function closeModal(modal) {
+  modal.classList.remove("show");
+}
+
+[
+  [$("close-event-form"), eventModal],
+  [$("close-event-detail"), eventDetailModal],
+  [$("close-task-form"), taskModal],
+  [$("close-task-detail"), taskDetailModal]
+].forEach(([button, modal]) => {
+  button.addEventListener("click", () => closeModal(modal));
+});
+
+[eventModal, eventDetailModal, taskModal, taskDetailModal].forEach(modal => {
+  modal.addEventListener("click", event => {
+    if (event.target === modal) closeModal(modal);
+  });
+});
+
+// =========================================================
+// PWA + LOCAL NOTIFICATION
+// =========================================================
+
+let swRegistration = null;
+
+async function registerServiceWorker() {
+  if (!("serviceWorker" in navigator)) return;
+  try {
+    swRegistration = await navigator.serviceWorker.register("./sw.js");
+    await navigator.serviceWorker.ready;
+  } catch (error) {
+    console.error("Service worker:", error);
+  }
+}
+
+function isStandaloneMode() {
+  return window.matchMedia?.("(display-mode: standalone)")?.matches || window.navigator.standalone === true;
+}
+
+function updateNotificationStatus() {
+  const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+
+  if (!("Notification" in window)) {
+    notificationStatus.textContent = isIOS && !isStandaloneMode()
+      ? "บน iPhone ให้ Add to Home Screen แล้วเปิดจากไอคอนก่อน"
+      : "เบราว์เซอร์นี้ยังไม่รองรับ Notification API";
+    return;
+  }
+
+  if (Notification.permission === "granted") {
+    notificationStatus.textContent = "เปิดแล้ว • พร้อมแจ้งเตือนขณะ Planner ทำงาน";
+  } else if (Notification.permission === "denied") {
+    notificationStatus.textContent = "ถูกปฏิเสธ • ต้องเปิดสิทธิ์จาก Settings";
+  } else {
+    notificationStatus.textContent = "ยังไม่ได้เปิดการแจ้งเตือน";
+  }
+}
+
+async function enableNotifications() {
+  if (!("Notification" in window)) {
+    const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+    alert(isIOS
+      ? "บน iPhone ให้เปิดเว็บด้วย Safari → Add to Home Screen → เปิด My Planner จากไอคอน แล้วลองอีกครั้ง"
+      : "อุปกรณ์นี้ยังไม่รองรับ Notification API");
+    return;
+  }
+
+  const permission = await Notification.requestPermission();
+  updateNotificationStatus();
+  if (permission === "granted") {
+    await showNotification("My Planner", "เปิดการแจ้งเตือนเรียบร้อยแล้ว", "planner-enabled");
+  }
+}
+
+async function showNotification(title, body, tag = "planner") {
+  if (!("Notification" in window) || Notification.permission !== "granted") return;
+  const registration = swRegistration || await navigator.serviceWorker.ready;
+  await registration.showNotification(title, {
+    body,
+    tag,
+    icon: "./icon.svg",
+    badge: "./icon.svg",
+    data: { url: "./" }
+  });
+}
+
+$("enable-notifications").addEventListener("click", enableNotifications);
+$("test-notification").addEventListener("click", async () => {
+  if (!("Notification" in window) || Notification.permission !== "granted") {
+    alert("กด 'เปิดแจ้งเตือน' ก่อนครับ");
+    return;
+  }
+  await showNotification("ทดสอบ My Planner", "ถ้าเห็นข้อความนี้ แปลว่าการแจ้งเตือนทำงานแล้ว", `planner-test-${Date.now()}`);
+});
+
+function notificationKey(eventId, offset) {
+  return `planner-notified-${eventId}-${offset}`;
+}
+
+async function checkDueReminders() {
+  if (!("Notification" in window) || Notification.permission !== "granted") return;
+
+  const now = Date.now();
+
+  for (const event of events) {
+    const start = new Date(`${event.date}T${event.startTime}:00`).getTime();
+
+    for (const offset of event.reminders || []) {
+      const due = start - offset * 60000;
+      const key = notificationKey(event.id, offset);
+
+      if (now >= due && now - due < 120000 && !localStorage.getItem(key)) {
+        localStorage.setItem(key, "1");
+        await showNotification(
+          event.title,
+          `${reminderText([offset])} • ${event.startTime}${event.location ? ` • ${event.location}` : ""}`,
+          key
+        );
+      }
+    }
+  }
+}
+
+setInterval(checkDueReminders, 30000);
+
+// =========================================================
+// EXPORT .ICS
+// =========================================================
+
+function pad2(number) {
+  return String(number).padStart(2, "0");
+}
+
+function icsLocalDate(dateKey, time) {
+  const [year, month, day] = dateKey.split("-").map(Number);
+  const [hour, minute] = time.split(":").map(Number);
+  return `${year}${pad2(month)}${pad2(day)}T${pad2(hour)}${pad2(minute)}00`;
+}
+
+function escapeICS(value = "") {
+  return value
+    .replace(/\\/g, "\\\\")
+    .replace(/\n/g, "\\n")
+    .replace(/,/g, "\\,")
+    .replace(/;/g, "\\;");
+}
+
+function exportEventICS(event) {
+  let alarms = "";
+
+  (event.reminders || []).forEach(minutes => {
+    alarms += `BEGIN:VALARM\r\nTRIGGER:-PT${minutes}M\r\nACTION:DISPLAY\r\nDESCRIPTION:${escapeICS(event.title)}\r\nEND:VALARM\r\n`;
+  });
+
+  const ics = `BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//My Planner//TH\r\nCALSCALE:GREGORIAN\r\nBEGIN:VEVENT\r\nUID:${event.id}@my-planner\r\nDTSTAMP:${new Date().toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z/, "Z")}\r\nDTSTART:${icsLocalDate(event.date, event.startTime)}\r\nDTEND:${icsLocalDate(event.date, event.endTime)}\r\nSUMMARY:${escapeICS(event.title)}\r\nLOCATION:${escapeICS(event.location)}\r\nDESCRIPTION:${escapeICS(event.note)}\r\n${alarms}END:VEVENT\r\nEND:VCALENDAR\r\n`;
+
+  const blob = new Blob([ics], { type: "text/calendar;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = `my-planner-${event.date}.ics`;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+$("export-calendar").addEventListener("click", () => {
+  const event = events.find(item => item.id === String(selectedEventId));
+  if (event) exportEventICS(event);
+});
+
+// =========================================================
+// START
+// =========================================================
+
+registerServiceWorker().then(() => {
+  updateNotificationStatus();
+  checkDueReminders();
+});
+
+saveLocalBackup();
+renderEverything();
