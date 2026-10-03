@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="th">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <title>My Planner</title>
+
+  <link rel="stylesheet" href="style.css">
+</head>
+
+
+<body>
+
+  <div class="app">
+
+    <!-- HEADER -->
+
+    <div class="top-bar">
+
+      <div>
+        <h1>My Planner</h1>
+        <p id="today-text"></p>
+      </div>
+
+      <div class="clock">
+        <div id="time-text">--:--</div>
+        <small>เวลาปัจจุบัน</small>
+      </div>
+
+    </div>
+
+
+    <!-- CALENDAR -->
+
+    <div class="calendar-card">
+
+      <div class="calendar-header">
+
+        <button id="prev-month">‹</button>
+
+        <h2 id="month-title"></h2>
+
+        <button id="next-month">›</button>
+
+      </div>
+
+      <div
+        class="calendar"
+        id="calendar">
+      </div>
+
+    </div>
+
+
+    <!-- EVENTS -->
+
+    <div class="event-header">
+
+      <h2 id="appointment-title">
+        นัดหมาย
+      </h2>
+
+    </div>
+
+    <div id="event-list"></div>
+
+
+    <!-- ADD BUTTON -->
+
+    <button
+      class="add-btn"
+      id="add-btn">
+      +
+    </button>
+
+  </div>
+
+
+
+  <!-- ========================== -->
+  <!-- เพิ่ม / แก้ไข นัดหมาย -->
+  <!-- ========================== -->
+
+  <div
+    class="modal"
+    id="event-modal">
+
+    <div class="modal-box">
+
+      <div class="modal-header">
+
+        <h2 id="form-title">
+          เพิ่มนัดหมาย
+        </h2>
+
+        <button
+          class="close-btn"
+          id="close-form">
+          ×
+        </button>
+
+      </div>
+
+
+      <label>
+        ชื่อนัดหมาย
+      </label>
+
+      <input
+        id="event-title"
+        type="text"
+        placeholder="เช่น ตรวจอาคาร">
+
+
+      <label>
+        วันที่
+      </label>
+
+      <input
+        id="event-date"
+        type="date">
+
+
+      <div class="time-row">
+
+        <div>
+
+          <label>
+            เวลาเริ่ม
+          </label>
+
+          <input
+            id="start-time"
+            type="time">
+
+        </div>
+
+
+        <div>
+
+          <label>
+            เวลาสิ้นสุด
+          </label>
+
+          <input
+            id="end-time"
+            type="time">
+
+        </div>
+
+      </div>
+
+
+      <label>
+        สถานที่
+      </label>
+
+      <input
+        id="event-location"
+        type="text"
+        placeholder="เช่น สำนักงานเขต">
+
+
+      <label>
+        รายละเอียด
+      </label>
+
+      <textarea
+        id="event-note"
+        rows="4"
+        placeholder="รายละเอียดเพิ่มเติม...">
+      </textarea>
+
+
+      <button
+        class="save-btn"
+        id="save-event">
+        บันทึกนัดหมาย
+      </button>
+
+    </div>
+
+  </div>
+
+
+
+  <!-- ========================== -->
+  <!-- ดูรายละเอียด -->
+  <!-- ========================== -->
+
+  <div
+    class="modal"
+    id="detail-modal">
+
+    <div class="modal-box">
+
+      <div class="modal-header">
+
+        <h2>
+          รายละเอียดนัดหมาย
+        </h2>
+
+        <button
+          class="close-btn"
+          id="close-detail">
+          ×
+        </button>
+
+      </div>
+
+
+      <h2 id="detail-title"></h2>
+
+      <div class="detail-line">
+        📅
+        <span id="detail-date"></span>
+      </div>
+
+      <div class="detail-line">
+        🕐
+        <span id="detail-time"></span>
+      </div>
+
+      <div class="detail-line">
+        📍
+        <span id="detail-location"></span>
+      </div>
+
+
+      <div class="detail-note">
+
+        <strong>
+          รายละเอียด
+        </strong>
+
+        <p id="detail-note"></p>
+
+      </div>
+
+
+      <div class="detail-actions">
+
+        <button
+          class="edit-btn"
+          id="edit-event">
+          แก้ไข
+        </button>
+
+        <button
+          class="delete-btn"
+          id="delete-event">
+          ลบนัดหมาย
+        </button>
+
+      </div>
+
+    </div>
+
+  </div>
+
+
+  <script src="script.js"></script>
+
+</body>
+
+</html>
