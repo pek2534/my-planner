@@ -212,3 +212,94 @@
   .bottom-nav{left:8px;right:8px;padding:6px}
   .nav-btn{font-size:11px}
 }
+
+/* =========================================================
+   V0.7 CLIENT GROUPING / จัดกลุ่มงานนอกตามผู้ว่าจ้าง
+   ========================================================= */
+.client-group{
+  margin:0 0 20px;
+  padding:15px;
+  border:1px solid #dde6f2;
+  border-radius:20px;
+  background:#fbfdff;
+}
+.client-group-header{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:12px;
+  margin-bottom:10px;
+}
+.client-group-header small{
+  display:block;
+  margin-bottom:4px;
+  color:#8793a8;
+  font-size:11px;
+}
+.client-group-header h3{
+  margin:0;
+  color:#16245c;
+  font-size:20px;
+}
+.client-project-count{
+  flex:0 0 auto;
+  padding:6px 9px;
+  border-radius:999px;
+  background:#eaf2ff;
+  color:#2878ff;
+  font-size:11px;
+  font-weight:700;
+}
+.client-money-summary{
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:7px;
+  margin-bottom:12px;
+}
+.client-money-summary>div{
+  min-width:0;
+  padding:9px;
+  border-radius:12px;
+  background:#f1f5fb;
+}
+.client-money-summary small{
+  display:block;
+  margin-bottom:3px;
+  color:#8490a3;
+  font-size:10px;
+}
+.client-money-summary strong{
+  display:block;
+  overflow:hidden;
+  color:#26344c;
+  font-size:12px;
+  font-variant-numeric:tabular-nums;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+.client-money-summary .remaining strong{
+  color:#df415d;
+}
+.client-project-list .freelance-card{
+  margin-bottom:8px;
+  background:#fff;
+}
+.client-project-list .freelance-card:last-child{
+  margin-bottom:0;
+}
+.client-detail-label{
+  margin-top:2px;
+  color:#8793a8;
+  font-size:12px;
+}
+.client-detail-name{
+  margin:3px 0 14px;
+  color:#2878ff;
+  font-size:16px;
+  font-weight:700;
+}
+@media(max-width:500px){
+  .client-group{padding:13px}
+  .client-money-summary{grid-template-columns:1fr 1fr}
+  .client-money-summary .remaining{grid-column:1/-1}
+}

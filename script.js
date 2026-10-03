@@ -143,10 +143,20 @@ function normalizeFreelance(list) {
   return list.map(project => ({
     ...project,
     id: String(project.id ?? makeId("freelance")),
+    clientName: normalizeClientName(project.clientName || project.client || "ไม่ระบุผู้ว่าจ้าง"),
     name: project.name || "ไม่มีชื่อโปรเจกต์",
     totalAmount: Math.max(0, Number(project.totalAmount) || 0),
     receivedAmount: Math.max(0, Number(project.receivedAmount) || 0)
   }));
+}
+
+function normalizeClientName(value) {
+  const cleaned = String(value || "").trim().replace(/\s+/g, " ");
+  return cleaned || "ไม่ระบุผู้ว่าจ้าง";
+}
+
+function clientGroupKey(value) {
+  return normalizeClientName(value).toLocaleLowerCase("th-TH");
 }
 
 function makeId(prefix) {
@@ -274,6 +284,7 @@ function firestoreTaskData(task) {
 
 function firestoreFreelanceData(project) {
   return {
+    clientName: normalizeClientName(project.clientName),
     name: project.name,
     totalAmount: Number(project.totalAmount) || 0,
     receivedAmount: Number(project.receivedAmount) || 0,
@@ -825,6 +836,57 @@ function createFreelanceCard(project) {
   return card;
 }
 
+function createClientGroup(clientName, projects) {
+  const group = document.createElement("section");
+  group.className = "client-group";
+
+  const header = document.createElement("div");
+  header.className = "client-group-header";
+
+  const titleWrap = document.createElement("div");
+  const label = document.createElement("small");
+  label.textContent = "ผู้ว่าจ้าง / ลูกค้า";
+  const title = document.createElement("h3");
+  title.textContent = clientName;
+  titleWrap.append(label, title);
+
+  const count = document.createElement("span");
+  count.className = "client-project-count";
+  count.textContent = `${projects.length} โปรเจกต์`;
+
+  header.append(titleWrap, count);
+
+  const total = projects.reduce((sum, item) => sum + (Number(item.totalAmount) || 0), 0);
+  const received = projects.reduce((sum, item) => sum + (Number(item.receivedAmount) || 0), 0);
+  const remaining = projects.reduce((sum, item) => sum + remainingAmount(item), 0);
+
+  const summary = document.createElement("div");
+  summary.className = "client-money-summary";
+  [
+    ["เงินทั้งหมด", total, ""],
+    ["รับแล้ว", received, ""],
+    ["ค้างเบิก", remaining, "remaining"]
+  ].forEach(([text, value, className]) => {
+    const item = document.createElement("div");
+    if (className) item.className = className;
+    const small = document.createElement("small");
+    small.textContent = text;
+    const strong = document.createElement("strong");
+    strong.textContent = formatMoney(value);
+    item.append(small, strong);
+    summary.appendChild(item);
+  });
+
+  const projectList = document.createElement("div");
+  projectList.className = "client-project-list";
+  [...projects]
+    .sort((a, b) => a.name.localeCompare(b.name, "th"))
+    .forEach(project => projectList.appendChild(createFreelanceCard(project)));
+
+  group.append(header, summary, projectList);
+  return group;
+}
+
 function renderFreelancePage() {
   const list = $("freelance-list");
   list.innerHTML = "";
@@ -843,9 +905,24 @@ function renderFreelancePage() {
     return;
   }
 
-  [...freelanceProjects]
-    .sort((a, b) => a.name.localeCompare(b.name, "th"))
-    .forEach(project => list.appendChild(createFreelanceCard(project)));
+  const groups = new Map();
+
+  freelanceProjects.forEach(project => {
+    const displayName = normalizeClientName(project.clientName);
+    const key = clientGroupKey(displayName);
+    if (!groups.has(key)) {
+      groups.set(key, { clientName: displayName, projects: [] });
+    }
+    groups.get(key).projects.push(project);
+  });
+
+  [...groups.values()]
+    .sort((a, b) => {
+      if (a.clientName === "ไม่ระบุผู้ว่าจ้าง") return 1;
+      if (b.clientName === "ไม่ระบุผู้ว่าจ้าง") return -1;
+      return a.clientName.localeCompare(b.clientName, "th");
+    })
+    .forEach(group => list.appendChild(createClientGroup(group.clientName, group.projects)));
 }
 
 function renderEverything() {
@@ -1061,6 +1138,7 @@ function openTaskDetail(id) {
 
 const freelanceModal = $("freelance-modal");
 const freelanceDetailModal = $("freelance-detail-modal");
+const freelanceClient = $("freelance-client");
 const freelanceName = $("freelance-name");
 const freelanceTotalInput = $("freelance-total-input");
 const freelanceReceivedInput = $("freelance-received-input");
@@ -1078,6 +1156,7 @@ freelanceReceivedInput.addEventListener("input", updateFreelancePreview);
 function openAddFreelance() {
   editingFreelanceId = null;
   $("freelance-form-title").textContent = "เพิ่มโปรเจกต์งานนอก";
+  freelanceClient.value = "";
   freelanceName.value = "";
   freelanceTotalInput.value = "";
   freelanceReceivedInput.value = "";
@@ -1091,6 +1170,7 @@ function openEditFreelance(id) {
 
   editingFreelanceId = project.id;
   $("freelance-form-title").textContent = "แก้ไขโปรเจกต์งานนอก";
+  freelanceClient.value = project.clientName === "ไม่ระบุผู้ว่าจ้าง" ? "" : project.clientName;
   freelanceName.value = project.name;
   freelanceTotalInput.value = String(project.totalAmount);
   freelanceReceivedInput.value = String(project.receivedAmount);
@@ -1102,6 +1182,7 @@ function openEditFreelance(id) {
 async function saveFreelance() {
   if (!currentUser) return;
 
+  const clientName = normalizeClientName(freelanceClient.value);
   const name = freelanceName.value.trim();
   const totalAmount = Number(freelanceTotalInput.value);
   const receivedAmount = Number(freelanceReceivedInput.value);
@@ -1122,7 +1203,7 @@ async function saveFreelance() {
   }
 
   const id = editingFreelanceId || makeId("freelance");
-  const data = { id, name, totalAmount, receivedAmount };
+  const data = { id, clientName, name, totalAmount, receivedAmount };
 
   try {
     setSyncState("กำลังบันทึกงานนอก...", "busy");
@@ -1141,6 +1222,7 @@ function openFreelanceDetail(id) {
   if (!project) return;
 
   selectedFreelanceId = project.id;
+  $("detail-freelance-client").textContent = project.clientName;
   $("detail-freelance-name").textContent = project.name;
   $("detail-freelance-total").textContent = formatMoney(project.totalAmount);
   $("detail-freelance-received").textContent = formatMoney(project.receivedAmount);
