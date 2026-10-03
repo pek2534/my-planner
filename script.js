@@ -87,13 +87,17 @@ let selectedEventId = null;
 let editingEventId = null;
 let selectedTaskId = null;
 let editingTaskId = null;
+let selectedFreelanceId = null;
+let editingFreelanceId = null;
 let taskFilter = "pending";
 
 let currentUser = null;
 let unsubscribeEvents = null;
 let unsubscribeTasks = null;
+let unsubscribeFreelance = null;
 let events = normalizeEvents(JSON.parse(localStorage.getItem("planner-events") || "[]"));
 let tasks = normalizeTasks(JSON.parse(localStorage.getItem("planner-tasks") || "[]"));
+let freelanceProjects = normalizeFreelance(JSON.parse(localStorage.getItem("planner-freelance") || "[]"));
 
 // =========================================================
 // NORMALIZE / UTILITIES
@@ -113,7 +117,6 @@ function normalizeEvents(list) {
       : [],
     date: event.date || formatDateKey(new Date()),
     startTime: event.startTime || "09:00",
-    endTime: event.endTime || "10:00",
     location: event.location || "",
     note: event.note || ""
   }));
@@ -132,6 +135,17 @@ function normalizeTasks(list) {
     completed: Boolean(task.completed),
     date: task.date || formatDateKey(new Date()),
     note: task.note || ""
+  }));
+}
+
+function normalizeFreelance(list) {
+  if (!Array.isArray(list)) return [];
+  return list.map(project => ({
+    ...project,
+    id: String(project.id ?? makeId("freelance")),
+    name: project.name || "ไม่มีชื่อโปรเจกต์",
+    totalAmount: Math.max(0, Number(project.totalAmount) || 0),
+    receivedAmount: Math.max(0, Number(project.receivedAmount) || 0)
   }));
 }
 
@@ -168,9 +182,19 @@ function priorityName(priority) {
   return priority === "urgent" ? "ด่วน" : priority === "high" ? "สำคัญ" : "ปกติ";
 }
 
+function formatMoney(value) {
+  const amount = Number(value) || 0;
+  return `฿${amount.toLocaleString("th-TH", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
+}
+
+function remainingAmount(project) {
+  return Math.max(0, (Number(project.totalAmount) || 0) - (Number(project.receivedAmount) || 0));
+}
+
 function saveLocalBackup() {
   localStorage.setItem("planner-events", JSON.stringify(events));
   localStorage.setItem("planner-tasks", JSON.stringify(tasks));
+  localStorage.setItem("planner-freelance", JSON.stringify(freelanceProjects));
 }
 
 function emptyMessage(text) {
@@ -230,7 +254,6 @@ function firestoreEventData(event) {
     reminders: event.reminders,
     date: event.date,
     startTime: event.startTime,
-    endTime: event.endTime,
     location: event.location || "",
     note: event.note || "",
     updatedAt: serverTimestamp()
@@ -245,6 +268,15 @@ function firestoreTaskData(task) {
     completed: Boolean(task.completed),
     date: task.date,
     note: task.note || "",
+    updatedAt: serverTimestamp()
+  };
+}
+
+function firestoreFreelanceData(project) {
+  return {
+    name: project.name,
+    totalAmount: Number(project.totalAmount) || 0,
+    receivedAmount: Number(project.receivedAmount) || 0,
     updatedAt: serverTimestamp()
   };
 }
@@ -305,8 +337,9 @@ async function migrateLocalData(user) {
 
   const localEvents = normalizeEvents(JSON.parse(localStorage.getItem("planner-events") || "[]"));
   const localTasks = normalizeTasks(JSON.parse(localStorage.getItem("planner-tasks") || "[]"));
+  const localFreelance = normalizeFreelance(JSON.parse(localStorage.getItem("planner-freelance") || "[]"));
 
-  if (!localEvents.length && !localTasks.length) {
+  if (!localEvents.length && !localTasks.length && !localFreelance.length) {
     localStorage.setItem(migrationKey, "1");
     return;
   }
@@ -325,6 +358,11 @@ async function migrateLocalData(user) {
     writes.push(setDoc(userDoc("tasks", id), firestoreTaskData(task), { merge: true }));
   });
 
+  localFreelance.forEach(project => {
+    const id = String(project.id || makeId("freelance"));
+    writes.push(setDoc(userDoc("freelance", id), firestoreFreelanceData(project), { merge: true }));
+  });
+
   await Promise.all(writes);
   localStorage.setItem(migrationKey, "1");
 }
@@ -332,8 +370,10 @@ async function migrateLocalData(user) {
 function stopCloudListeners() {
   if (unsubscribeEvents) unsubscribeEvents();
   if (unsubscribeTasks) unsubscribeTasks();
+  if (unsubscribeFreelance) unsubscribeFreelance();
   unsubscribeEvents = null;
   unsubscribeTasks = null;
+  unsubscribeFreelance = null;
 }
 
 function startCloudListeners() {
@@ -371,6 +411,23 @@ function startCloudListeners() {
     error => {
       console.error("Tasks sync error:", error);
       setSyncState("ซิงก์งานไม่สำเร็จ", "error");
+    }
+  );
+
+  unsubscribeFreelance = onSnapshot(
+    userCollection("freelance"),
+    snapshot => {
+      freelanceProjects = normalizeFreelance(snapshot.docs.map(snapshotDoc => ({
+        id: snapshotDoc.id,
+        ...snapshotDoc.data()
+      })));
+      saveLocalBackup();
+      renderEverything();
+      setSyncState(navigator.onLine ? "ซิงก์แล้ว" : "ออฟไลน์ • ใช้ข้อมูลล่าสุด", navigator.onLine ? "online" : "busy");
+    },
+    error => {
+      console.error("Freelance sync error:", error);
+      setSyncState("ซิงก์งานนอกไม่สำเร็จ", "error");
     }
   );
 }
@@ -457,7 +514,7 @@ function createEventCard(event) {
 
   const time = document.createElement("div");
   time.className = "event-time";
-  time.textContent = `${event.startTime} - ${event.endTime}`;
+  time.textContent = event.startTime;
 
   const title = document.createElement("span");
   title.className = "event-title";
@@ -736,11 +793,67 @@ function renderTaskPage() {
   list.forEach(task => allTaskList.appendChild(createTaskCard(task)));
 }
 
+function createFreelanceCard(project) {
+  const card = document.createElement("div");
+  card.className = "freelance-card";
+
+  const name = document.createElement("h3");
+  name.textContent = project.name;
+
+  const moneyGrid = document.createElement("div");
+  moneyGrid.className = "freelance-money-grid";
+
+  const items = [
+    ["เงินทั้งหมด", project.totalAmount, ""],
+    ["รับมาแล้ว", project.receivedAmount, ""],
+    ["เหลือค้างเบิก", remainingAmount(project), "remaining"]
+  ];
+
+  items.forEach(([label, value, className]) => {
+    const box = document.createElement("div");
+    if (className) box.className = className;
+    const small = document.createElement("small");
+    small.textContent = label;
+    const strong = document.createElement("strong");
+    strong.textContent = formatMoney(value);
+    box.append(small, strong);
+    moneyGrid.appendChild(box);
+  });
+
+  card.append(name, moneyGrid);
+  card.addEventListener("click", () => openFreelanceDetail(project.id));
+  return card;
+}
+
+function renderFreelancePage() {
+  const list = $("freelance-list");
+  list.innerHTML = "";
+
+  const total = freelanceProjects.reduce((sum, item) => sum + (Number(item.totalAmount) || 0), 0);
+  const received = freelanceProjects.reduce((sum, item) => sum + (Number(item.receivedAmount) || 0), 0);
+  const remaining = freelanceProjects.reduce((sum, item) => sum + remainingAmount(item), 0);
+
+  $("freelance-project-count").textContent = String(freelanceProjects.length);
+  $("freelance-total").textContent = formatMoney(total);
+  $("freelance-received").textContent = formatMoney(received);
+  $("freelance-remaining").textContent = formatMoney(remaining);
+
+  if (!freelanceProjects.length) {
+    list.appendChild(emptyMessage("ยังไม่มีโปรเจกต์งานนอก"));
+    return;
+  }
+
+  [...freelanceProjects]
+    .sort((a, b) => a.name.localeCompare(b.name, "th"))
+    .forEach(project => list.appendChild(createFreelanceCard(project)));
+}
+
 function renderEverything() {
   renderToday();
   renderCalendar();
   renderSelectedDate();
   renderTaskPage();
+  renderFreelancePage();
   updateNotificationStatus();
 }
 
@@ -753,7 +866,6 @@ const eventDetailModal = $("event-detail-modal");
 const eventTitle = $("event-title");
 const eventDate = $("event-date");
 const eventStart = $("event-start-time");
-const eventEnd = $("event-end-time");
 const eventLocation = $("event-location");
 const eventNote = $("event-note");
 
@@ -765,7 +877,6 @@ function openAddEvent(date = selectedDate) {
   setChecks("event-reminders", []);
   eventDate.value = formatDateKey(date);
   eventStart.value = "09:00";
-  eventEnd.value = "10:00";
   eventLocation.value = "";
   eventNote.value = "";
   eventModal.classList.add("show");
@@ -782,7 +893,6 @@ function openEditEvent(id) {
   setChecks("event-reminders", event.reminders.map(String));
   eventDate.value = event.date;
   eventStart.value = event.startTime;
-  eventEnd.value = event.endTime;
   eventLocation.value = event.location;
   eventNote.value = event.note;
   eventDetailModal.classList.remove("show");
@@ -797,15 +907,9 @@ async function saveEvent() {
   const reminders = getChecks("event-reminders").map(Number);
   const date = eventDate.value;
   const startTime = eventStart.value;
-  const endTime = eventEnd.value;
 
-  if (!title || !eventCategories.length || !date || !startTime || !endTime) {
-    alert("กรุณากรอกชื่อ เลือกประเภท วันที่ และเวลาให้ครบ");
-    return;
-  }
-
-  if (endTime < startTime) {
-    alert("เวลาสิ้นสุดต้องไม่ก่อนเวลาเริ่ม");
+  if (!title || !eventCategories.length || !date || !startTime) {
+    alert("กรุณากรอกชื่อ เลือกประเภท วันที่ และเวลาเริ่มให้ครบ");
     return;
   }
 
@@ -817,7 +921,6 @@ async function saveEvent() {
     reminders,
     date,
     startTime,
-    endTime,
     location: eventLocation.value.trim(),
     note: eventNote.value.trim()
   };
@@ -855,7 +958,7 @@ function openEventDetail(id) {
   createCategoryBadges(event.categories, $("detail-event-categories"));
   $("detail-event-title").textContent = event.title;
   $("detail-event-date").textContent = thaiDate(event.date);
-  $("detail-event-time").textContent = `${event.startTime} - ${event.endTime}`;
+  $("detail-event-time").textContent = event.startTime;
   $("detail-event-location").textContent = event.location || "ไม่ได้ระบุสถานที่";
   $("detail-event-reminders").textContent = reminderText(event.reminders);
   $("detail-event-note").textContent = event.note || "ไม่มีรายละเอียดเพิ่มเติม";
@@ -953,6 +1056,99 @@ function openTaskDetail(id) {
 }
 
 // =========================================================
+// FREELANCE FORM / DETAIL
+// =========================================================
+
+const freelanceModal = $("freelance-modal");
+const freelanceDetailModal = $("freelance-detail-modal");
+const freelanceName = $("freelance-name");
+const freelanceTotalInput = $("freelance-total-input");
+const freelanceReceivedInput = $("freelance-received-input");
+const freelanceRemainingPreview = $("freelance-remaining-preview");
+
+function updateFreelancePreview() {
+  const total = Math.max(0, Number(freelanceTotalInput.value) || 0);
+  const received = Math.max(0, Number(freelanceReceivedInput.value) || 0);
+  freelanceRemainingPreview.textContent = formatMoney(Math.max(0, total - received));
+}
+
+freelanceTotalInput.addEventListener("input", updateFreelancePreview);
+freelanceReceivedInput.addEventListener("input", updateFreelancePreview);
+
+function openAddFreelance() {
+  editingFreelanceId = null;
+  $("freelance-form-title").textContent = "เพิ่มโปรเจกต์งานนอก";
+  freelanceName.value = "";
+  freelanceTotalInput.value = "";
+  freelanceReceivedInput.value = "";
+  updateFreelancePreview();
+  freelanceModal.classList.add("show");
+}
+
+function openEditFreelance(id) {
+  const project = freelanceProjects.find(item => item.id === String(id));
+  if (!project) return;
+
+  editingFreelanceId = project.id;
+  $("freelance-form-title").textContent = "แก้ไขโปรเจกต์งานนอก";
+  freelanceName.value = project.name;
+  freelanceTotalInput.value = String(project.totalAmount);
+  freelanceReceivedInput.value = String(project.receivedAmount);
+  updateFreelancePreview();
+  freelanceDetailModal.classList.remove("show");
+  freelanceModal.classList.add("show");
+}
+
+async function saveFreelance() {
+  if (!currentUser) return;
+
+  const name = freelanceName.value.trim();
+  const totalAmount = Number(freelanceTotalInput.value);
+  const receivedAmount = Number(freelanceReceivedInput.value);
+
+  if (!name || !Number.isFinite(totalAmount) || !Number.isFinite(receivedAmount)) {
+    alert("กรุณากรอกชื่อโปรเจกต์ เงินทั้งหมด และรับมาแล้วให้ครบ");
+    return;
+  }
+
+  if (totalAmount < 0 || receivedAmount < 0) {
+    alert("จำนวนเงินต้องไม่ติดลบ");
+    return;
+  }
+
+  if (receivedAmount > totalAmount) {
+    alert("ยอดรับมาแล้วต้องไม่มากกว่าเงินทั้งหมด");
+    return;
+  }
+
+  const id = editingFreelanceId || makeId("freelance");
+  const data = { id, name, totalAmount, receivedAmount };
+
+  try {
+    setSyncState("กำลังบันทึกงานนอก...", "busy");
+    await setDoc(userDoc("freelance", id), firestoreFreelanceData(data), { merge: true });
+    freelanceModal.classList.remove("show");
+    editingFreelanceId = null;
+  } catch (error) {
+    console.error(error);
+    setSyncState("บันทึกงานนอกไม่สำเร็จ", "error");
+    alert("บันทึกโปรเจกต์ไม่สำเร็จ กรุณาลองใหม่");
+  }
+}
+
+function openFreelanceDetail(id) {
+  const project = freelanceProjects.find(item => item.id === String(id));
+  if (!project) return;
+
+  selectedFreelanceId = project.id;
+  $("detail-freelance-name").textContent = project.name;
+  $("detail-freelance-total").textContent = formatMoney(project.totalAmount);
+  $("detail-freelance-received").textContent = formatMoney(project.receivedAmount);
+  $("detail-freelance-remaining").textContent = formatMoney(remainingAmount(project));
+  freelanceDetailModal.classList.add("show");
+}
+
+// =========================================================
 // NAVIGATION + BUTTONS
 // =========================================================
 
@@ -988,8 +1184,10 @@ $("calendar-add-event").addEventListener("click", () => openAddEvent(selectedDat
 $("today-add-task").addEventListener("click", () => openAddTask(new Date()));
 $("calendar-add-task").addEventListener("click", () => openAddTask(selectedDate));
 $("task-add-button").addEventListener("click", () => openAddTask(new Date()));
+$("freelance-add-button").addEventListener("click", openAddFreelance);
 $("save-event").addEventListener("click", saveEvent);
 $("save-task").addEventListener("click", saveTask);
+$("save-freelance").addEventListener("click", saveFreelance);
 
 $("edit-event").addEventListener("click", () => {
   if (selectedEventId !== null) openEditEvent(selectedEventId);
@@ -1049,6 +1247,26 @@ $("complete-task").addEventListener("click", async () => {
   }
 });
 
+$("edit-freelance").addEventListener("click", () => {
+  if (selectedFreelanceId !== null) openEditFreelance(selectedFreelanceId);
+});
+
+$("delete-freelance").addEventListener("click", async () => {
+  const project = freelanceProjects.find(item => item.id === String(selectedFreelanceId));
+  if (!project || !confirm(`ต้องการลบโปรเจกต์ "${project.name}" ใช่หรือไม่?`)) return;
+
+  try {
+    setSyncState("กำลังลบงานนอก...", "busy");
+    await deleteDoc(userDoc("freelance", project.id));
+    selectedFreelanceId = null;
+    freelanceDetailModal.classList.remove("show");
+  } catch (error) {
+    console.error(error);
+    setSyncState("ลบงานนอกไม่สำเร็จ", "error");
+    alert("ลบโปรเจกต์ไม่สำเร็จ");
+  }
+});
+
 document.querySelectorAll(".filter-btn").forEach(button => {
   button.addEventListener("click", () => {
     taskFilter = button.dataset.filter;
@@ -1066,12 +1284,14 @@ function closeModal(modal) {
   [$("close-event-form"), eventModal],
   [$("close-event-detail"), eventDetailModal],
   [$("close-task-form"), taskModal],
-  [$("close-task-detail"), taskDetailModal]
+  [$("close-task-detail"), taskDetailModal],
+  [$("close-freelance-form"), freelanceModal],
+  [$("close-freelance-detail"), freelanceDetailModal]
 ].forEach(([button, modal]) => {
   button.addEventListener("click", () => closeModal(modal));
 });
 
-[eventModal, eventDetailModal, taskModal, taskDetailModal].forEach(modal => {
+[eventModal, eventDetailModal, taskModal, taskDetailModal, freelanceModal, freelanceDetailModal].forEach(modal => {
   modal.addEventListener("click", event => {
     if (event.target === modal) closeModal(modal);
   });
@@ -1212,7 +1432,7 @@ function exportEventICS(event) {
     alarms += `BEGIN:VALARM\r\nTRIGGER:-PT${minutes}M\r\nACTION:DISPLAY\r\nDESCRIPTION:${escapeICS(event.title)}\r\nEND:VALARM\r\n`;
   });
 
-  const ics = `BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//My Planner//TH\r\nCALSCALE:GREGORIAN\r\nBEGIN:VEVENT\r\nUID:${event.id}@my-planner\r\nDTSTAMP:${new Date().toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z/, "Z")}\r\nDTSTART:${icsLocalDate(event.date, event.startTime)}\r\nDTEND:${icsLocalDate(event.date, event.endTime)}\r\nSUMMARY:${escapeICS(event.title)}\r\nLOCATION:${escapeICS(event.location)}\r\nDESCRIPTION:${escapeICS(event.note)}\r\n${alarms}END:VEVENT\r\nEND:VCALENDAR\r\n`;
+  const ics = `BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//My Planner//TH\r\nCALSCALE:GREGORIAN\r\nBEGIN:VEVENT\r\nUID:${event.id}@my-planner\r\nDTSTAMP:${new Date().toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z/, "Z")}\r\nDTSTART:${icsLocalDate(event.date, event.startTime)}\r\nSUMMARY:${escapeICS(event.title)}\r\nLOCATION:${escapeICS(event.location)}\r\nDESCRIPTION:${escapeICS(event.note)}\r\n${alarms}END:VEVENT\r\nEND:VCALENDAR\r\n`;
 
   const blob = new Blob([ics], { type: "text/calendar;charset=utf-8" });
   const url = URL.createObjectURL(blob);

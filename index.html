@@ -136,10 +136,42 @@
     <div id="all-task-list"></div>
   </main>
 
+  <main id="freelance-page" class="page">
+    <div class="section-title-row task-page-title">
+      <div>
+        <span class="section-label">FREELANCE</span>
+        <h2>งานนอก</h2>
+      </div>
+      <button id="freelance-add-button" class="primary-btn" type="button">+ เพิ่มโปรเจกต์</button>
+    </div>
+
+    <section class="freelance-summary">
+      <div class="summary-card">
+        <small>โปรเจกต์</small>
+        <strong id="freelance-project-count">0</strong>
+      </div>
+      <div class="summary-card">
+        <small>เงินทั้งหมด</small>
+        <strong id="freelance-total">฿0</strong>
+      </div>
+      <div class="summary-card">
+        <small>รับมาแล้ว</small>
+        <strong id="freelance-received">฿0</strong>
+      </div>
+      <div class="summary-card highlight">
+        <small>เหลือค้างเบิก</small>
+        <strong id="freelance-remaining">฿0</strong>
+      </div>
+    </section>
+
+    <div id="freelance-list"></div>
+  </main>
+
   <nav class="bottom-nav">
     <button class="nav-btn active" data-page="today-page" type="button"><span>⌂</span>วันนี้</button>
     <button class="nav-btn" data-page="calendar-page" type="button"><span>▣</span>ปฏิทิน</button>
     <button class="nav-btn" data-page="tasks-page" type="button"><span>✓</span>งาน</button>
+    <button class="nav-btn" data-page="freelance-page" type="button"><span>฿</span>งานนอก</button>
   </nav>
 </div>
 
@@ -167,10 +199,8 @@
     <label>วันที่</label>
     <input id="event-date" type="date">
 
-    <div class="time-row">
-      <div><label>เวลาเริ่ม</label><input id="event-start-time" type="time"></div>
-      <div><label>เวลาสิ้นสุด</label><input id="event-end-time" type="time"></div>
-    </div>
+    <label>เวลาเริ่ม</label>
+    <input id="event-start-time" type="time">
 
     <label>สถานที่</label>
     <input id="event-location" type="text" placeholder="เช่น สำนักงาน / โครงการ">
@@ -267,6 +297,52 @@
     <div class="detail-actions">
       <button id="edit-task" class="edit-btn" type="button">แก้ไข</button>
       <button id="delete-task" class="delete-btn" type="button">ลบงาน</button>
+    </div>
+  </div>
+</div>
+
+<!-- FREELANCE FORM -->
+<div id="freelance-modal" class="modal">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h2 id="freelance-form-title">เพิ่มโปรเจกต์งานนอก</h2>
+      <button id="close-freelance-form" class="close-btn" type="button">×</button>
+    </div>
+
+    <label>ชื่อโปรเจกต์</label>
+    <input id="freelance-name" type="text" placeholder="เช่น MASS SPORT CLUB">
+
+    <label>เงินทั้งหมด</label>
+    <input id="freelance-total-input" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0">
+
+    <label>รับมาแล้ว</label>
+    <input id="freelance-received-input" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0">
+
+    <div class="calculated-box">
+      <span>เหลือค้างเบิก</span>
+      <strong id="freelance-remaining-preview">฿0</strong>
+    </div>
+
+    <button id="save-freelance" class="save-btn" type="button">บันทึกโปรเจกต์</button>
+  </div>
+</div>
+
+<!-- FREELANCE DETAIL -->
+<div id="freelance-detail-modal" class="modal">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h2>รายละเอียดงานนอก</h2>
+      <button id="close-freelance-detail" class="close-btn" type="button">×</button>
+    </div>
+
+    <h2 id="detail-freelance-name"></h2>
+    <div class="money-detail"><span>เงินทั้งหมด</span><strong id="detail-freelance-total"></strong></div>
+    <div class="money-detail"><span>รับมาแล้ว</span><strong id="detail-freelance-received"></strong></div>
+    <div class="money-detail outstanding"><span>เหลือค้างเบิก</span><strong id="detail-freelance-remaining"></strong></div>
+
+    <div class="detail-actions">
+      <button id="edit-freelance" class="edit-btn" type="button">แก้ไข</button>
+      <button id="delete-freelance" class="delete-btn" type="button">ลบโปรเจกต์</button>
     </div>
   </div>
 </div>
