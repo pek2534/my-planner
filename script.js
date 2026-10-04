@@ -45,12 +45,12 @@ const authPersistenceReady = setPersistence(auth, browserLocalPersistence);
 // =========================================================
 
 const categories = {
-  government: { name: "งานราชการ", icon: "🏛️", color: "#2878ff" },
-  freelance: { name: "งานออกแบบ", icon: "💼", color: "#8b5cf6" },
-  personal: { name: "ส่วนตัว", icon: "👤", color: "#14a673" },
-  fitness: { name: "ออกกำลังกาย", icon: "🏋️", color: "#ef4e7b" },
-  study: { name: "เรียน / พัฒนา", icon: "📚", color: "#e59323" },
-  finance: { name: "การเงิน", icon: "💰", color: "#16a085" }
+  government: { name: "งานราชการ", icon: "🏛️", color: "#66735a" },
+  freelance: { name: "งานออกแบบ", icon: "💼", color: "#a66a4c" },
+  personal: { name: "ส่วนตัว", icon: "👤", color: "#8b7e74" },
+  fitness: { name: "ออกกำลังกาย", icon: "🏋️", color: "#a95f56" },
+  study: { name: "เรียน / พัฒนา", icon: "📚", color: "#b58a43" },
+  finance: { name: "การเงิน", icon: "💰", color: "#5f7b72" }
 };
 
 const freelanceStatuses = {
@@ -2138,6 +2138,15 @@ nextMonth.addEventListener("click", () => {
     currentYear += 1;
   }
   renderCalendar();
+});
+
+$("calendar-go-today")?.addEventListener("click", () => {
+  const now = new Date();
+  selectedDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  currentMonth = selectedDate.getMonth();
+  currentYear = selectedDate.getFullYear();
+  renderCalendar();
+  renderSelectedDate();
 });
 
 $("today-add-event").addEventListener("click", () => openAddEvent(new Date()));

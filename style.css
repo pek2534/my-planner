@@ -463,3 +463,126 @@ EXCEL EXPORT
 .event-date-mode-option:has(input:checked){border-color:#2878ff;background:#f3f7ff;color:#2878ff}
 .event-date-mode-option input{margin:0;accent-color:#2878ff}
 .event-end-date-block.hidden{display:none}
+
+/* =========================================================
+   V1.3 CALENDAR-FIRST + EARTH TONE THEME
+   ========================================================= */
+:root{
+  --earth-bg:#f2ece3;
+  --earth-surface:#fffaf3;
+  --earth-surface-2:#f7f0e7;
+  --earth-surface-3:#eee4d8;
+  --earth-text:#403a32;
+  --earth-text-strong:#332f29;
+  --earth-muted:#897d70;
+  --earth-primary:#75624b;
+  --earth-primary-dark:#5e503f;
+  --earth-primary-soft:#e9dfd2;
+  --earth-border:#ded2c3;
+  --earth-success:#6f8063;
+  --earth-warning:#b58a43;
+  --earth-danger:#a75d52;
+  --earth-shadow:rgba(83,68,49,.12);
+}
+body{
+  background:var(--earth-bg);
+  color:var(--earth-text);
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Tahoma,Arial,sans-serif;
+}
+.app{background:var(--earth-surface);box-shadow:0 16px 45px var(--earth-shadow)}
+.top-bar{margin-bottom:18px}
+.top-bar h1,.calendar-header h2,.section-title-row h2,.login-card h1,.freelance-card h3,.client-group-header h3{color:var(--earth-text-strong)}
+.top-bar p,.clock small,.progress-text,.section-label,.cloud-panel small,.notification-panel p,.empty-state,.event-location,.task-meta,.login-hint{color:var(--earth-muted)}
+#time-text,.today-date-big{color:var(--earth-primary)}
+.cloud-panel{border-color:var(--earth-border);background:#fbf7f1}
+.sync-dot.online{background:var(--earth-success);box-shadow:0 0 0 4px rgba(111,128,99,.14)}
+.sync-dot.busy{background:var(--earth-warning);box-shadow:0 0 0 4px rgba(181,138,67,.14)}
+.sync-dot.error{background:var(--earth-danger);box-shadow:0 0 0 4px rgba(167,93,82,.14)}
+.hero-card,.detail-note,.detail-photo-section{background:var(--earth-surface-2)}
+.small-add-btn,.ghost-btn{background:var(--earth-primary-soft);color:var(--earth-primary-dark)}
+.primary-btn,.save-btn,.complete-btn{background:var(--earth-primary);color:#fff}
+.primary-btn:hover,.save-btn:hover{background:var(--earth-primary-dark)}
+.ghost-btn{background:#eee7dd;color:#6e6256}
+.notification-panel,.next-card,.freelance-card,.summary-card,.client-group,.modal-box{border-color:var(--earth-border);background:var(--earth-surface)}
+.calendar-home-card{padding:17px;border:1px solid var(--earth-border);background:#fffdf8;box-shadow:0 7px 24px rgba(83,68,49,.07)}
+.calendar-header{margin-bottom:12px}
+.calendar-title-wrap{display:flex;align-items:center;gap:8px;min-width:0}
+.calendar-title-wrap h2{font-size:19px;white-space:nowrap}
+.calendar-today-btn{padding:6px 9px;border:1px solid var(--earth-border);border-radius:999px;background:var(--earth-surface-2);color:var(--earth-primary-dark);font-size:11px;font-weight:700}
+.calendar-header>button{background:var(--earth-primary-soft);color:var(--earth-primary-dark)}
+.day-name{color:var(--earth-muted)}
+.calendar-day{color:var(--earth-text)}
+.calendar-day:hover{background:var(--earth-surface-2)}
+.calendar-day.today{border-color:var(--earth-primary)}
+.calendar-day.selected{background:var(--earth-primary);color:#fff}
+.event-dots{bottom:0;gap:2px}
+.event-dot{width:5px;height:5px;border:1px solid rgba(255,255,255,.75)}
+.category-legend{display:flex;flex-wrap:wrap;gap:6px 8px;margin-top:15px;padding-top:12px;border-top:1px solid #ece2d6}
+.legend-chip{display:inline-flex;align-items:center;gap:5px;color:#766b60;font-size:10px;white-space:nowrap}
+.legend-chip i{width:8px;height:8px;border-radius:50%;background:var(--legend);box-shadow:0 0 0 2px color-mix(in srgb,var(--legend) 18%, transparent)}
+.agenda-section{margin-bottom:24px}
+.event-card,.task-card{background:#fbf7f1;border:1px solid #e9ded1}
+.event-time{color:var(--earth-primary-dark)}
+.category-mini{background:#fffaf3}
+.task-check{border-color:#bbaa96;background:#fffdf8}
+.task-check.completed{border-color:var(--earth-primary);background:var(--earth-primary)}
+.filter-btn{background:#eee7dd;color:#6f6458}
+.filter-btn.active{background:var(--earth-primary);color:#fff}
+.bottom-nav{border-color:var(--earth-border);background:rgba(255,250,243,.97);box-shadow:0 7px 24px rgba(83,68,49,.10);backdrop-filter:blur(12px)}
+.nav-btn{color:#8a7d6f}
+.nav-btn.active{background:var(--earth-primary-soft);color:var(--earth-primary-dark);font-weight:800}
+.modal{background:rgba(58,48,38,.42)}
+.close-btn{background:#eee7dd;color:var(--earth-text)}
+label{color:var(--earth-text)}
+input[type=text],input[type=date],input[type=time],input[type=number],textarea,.login-card input[type=email],.login-card input[type=password]{border-color:var(--earth-border);background:#fffdf9;color:var(--earth-text)}
+input:focus,textarea:focus,.login-card input:focus{border-color:var(--earth-primary);box-shadow:0 0 0 3px rgba(117,98,75,.09)}
+.check-row{border-color:var(--earth-border);background:#fcf8f2}
+.box{border-color:#bcae9e;background:#fffdf8}
+.check-row:has(input:checked){border-color:var(--earth-primary);background:var(--earth-primary-soft)}
+.check-row input:checked+.box{border-color:var(--earth-primary);background:var(--earth-primary);color:#fff}
+.calendar-export-btn{background:var(--earth-primary-soft);color:var(--earth-primary-dark)}
+.edit-btn{background:var(--earth-primary-soft);color:var(--earth-primary-dark)}
+.delete-btn{background:#f7e8e4;color:var(--earth-danger)}
+.login-screen{background:var(--earth-bg)}
+.login-logo{background:var(--earth-primary)}
+.login-card{background:var(--earth-surface);box-shadow:0 18px 50px var(--earth-shadow)}
+.login-card>p{color:var(--earth-muted)}
+.login-error{color:var(--earth-danger)!important}
+.summary-card{background:#fbf7f1}
+.summary-card small{color:var(--earth-muted)}
+.summary-card strong{color:var(--earth-text)}
+.summary-card.highlight{border-color:#d9b7aa;background:#f8ece7}
+.summary-card.highlight strong{color:#9a574c}
+.freelance-card:hover{background:#faf4ec}
+.freelance-money-grid div,.client-money-summary>div{background:#f2eadf}
+.freelance-money-grid small,.client-money-summary small,.client-detail-label{color:var(--earth-muted)}
+.freelance-money-grid strong,.client-money-summary strong{color:var(--earth-text)}
+.freelance-money-grid .remaining strong,.client-money-summary .remaining strong{color:#9a574c}
+.calculated-box,.money-detail.outstanding{background:#f8ece7}
+.calculated-box strong,.money-detail.outstanding strong{color:#9a574c}
+.client-group{background:#fbf7f1}
+.client-project-count{background:var(--earth-primary-soft);color:var(--earth-primary-dark)}
+.client-detail-name{color:var(--earth-primary-dark)}
+.photo-add-btn{border-color:#bda98f;background:#fbf6ef;color:var(--earth-primary-dark)}
+.photo-status{color:var(--earth-muted)}
+.photo-preview-item,.detail-photo-item{border-color:var(--earth-border);background:#eee6dc}
+.freelance-status-badge.talking{background:#f3e7c7;color:#87662e}
+.freelance-status-badge.in_progress{background:#e3e7dc;color:#5f6d54}
+.freelance-status-badge.paid{background:#dde9df;color:#56705d}
+.version-chip{background:#eee7dd;color:#756a5e}
+.excel-export-panel{border-color:var(--earth-border);background:#f8f1e8}
+.excel-export-panel strong{color:var(--earth-text-strong)}
+.excel-export-panel p{color:var(--earth-muted)}
+.compact-report-panel{margin-top:8px}
+.event-date-mode-option{border-color:var(--earth-border);background:#fcf8f2}
+.event-date-mode-option:has(input:checked){border-color:var(--earth-primary);background:var(--earth-primary-soft);color:var(--earth-primary-dark)}
+.event-date-mode-option input{accent-color:var(--earth-primary)}
+
+@media(max-width:500px){
+  body{background:var(--earth-surface)}
+  .app{background:var(--earth-surface);padding:20px 18px 98px}
+  .top-bar{margin-bottom:14px}
+  .cloud-panel{margin-bottom:16px;padding:11px 12px}
+  .calendar-home-card{padding:14px}
+  .category-legend{gap:6px 10px}
+}

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#2878ff">
+  <meta name="theme-color" content="#75624b">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="My Planner">
@@ -51,7 +51,7 @@
     <button id="logout-button" class="ghost-btn" type="button">ออกจากระบบ</button>
   </section>
 
-  <main id="today-page" class="page active">
+  <main id="today-page" class="page">
     <section class="hero-card">
       <div>
         <span class="section-label">TODAY</span>
@@ -94,25 +94,28 @@
     </section>
   </main>
 
-  <main id="calendar-page" class="page">
-    <section class="excel-export-panel">
-      <div>
-        <strong>🏛️ รายงานงานราชการ</strong>
-        <p>ส่งออกนัดหมายที่ติ๊ก “งานราชการ” ทั้งหมด พร้อมรายละเอียด/บันทึก เป็นไฟล์ Excel</p>
-      </div>
-      <button id="export-government-excel" class="primary-btn" type="button">⬇ Excel</button>
-    </section>
-
-    <section class="calendar-card">
+  <main id="calendar-page" class="page active">
+    <section class="calendar-card calendar-home-card">
       <div class="calendar-header">
-        <button id="prev-month" type="button">‹</button>
-        <h2 id="month-title"></h2>
-        <button id="next-month" type="button">›</button>
+        <button id="prev-month" type="button" aria-label="เดือนก่อนหน้า">‹</button>
+        <div class="calendar-title-wrap">
+          <h2 id="month-title"></h2>
+          <button id="calendar-go-today" class="calendar-today-btn" type="button">วันนี้</button>
+        </div>
+        <button id="next-month" type="button" aria-label="เดือนถัดไป">›</button>
       </div>
       <div id="calendar" class="calendar"></div>
+      <div class="category-legend" aria-label="สีหมวดหมู่">
+        <span class="legend-chip"><i style="--legend:#66735a"></i>ราชการ</span>
+        <span class="legend-chip"><i style="--legend:#a66a4c"></i>งานออกแบบ</span>
+        <span class="legend-chip"><i style="--legend:#8b7e74"></i>ส่วนตัว</span>
+        <span class="legend-chip"><i style="--legend:#a95f56"></i>ออกกำลัง</span>
+        <span class="legend-chip"><i style="--legend:#b58a43"></i>เรียน</span>
+        <span class="legend-chip"><i style="--legend:#5f7b72"></i>การเงิน</span>
+      </div>
     </section>
 
-    <section>
+    <section class="agenda-section">
       <div class="section-title-row">
         <h2 id="appointment-title">นัดหมาย</h2>
         <button id="calendar-add-event" class="small-add-btn" type="button">+ นัด</button>
@@ -120,12 +123,20 @@
       <div id="event-list"></div>
     </section>
 
-    <section>
+    <section class="agenda-section">
       <div class="section-title-row">
         <h2>งานของวันนี้</h2>
         <button id="calendar-add-task" class="small-add-btn" type="button">+ จัดงาน</button>
       </div>
       <div id="calendar-task-list"></div>
+    </section>
+
+    <section class="excel-export-panel compact-report-panel">
+      <div>
+        <strong>🏛️ รายงานงานราชการ</strong>
+        <p>ส่งออกนัดหมายหมวดงานราชการ พร้อมรายละเอียด/บันทึก เป็น Excel</p>
+      </div>
+      <button id="export-government-excel" class="primary-btn" type="button">⬇ Excel</button>
     </section>
   </main>
 
@@ -135,7 +146,7 @@
         <span class="section-label">DAILY PLAN</span>
         <h2>แผนงานของฉัน</h2>
       </div>
-      <span class="version-chip">v1.2</span>
+      <span class="version-chip">v1.3</span>
     </div>
 
     <section class="plan-date-card">
@@ -206,10 +217,10 @@
   </main>
 
   <nav class="bottom-nav">
-    <button class="nav-btn active" data-page="today-page" type="button"><span>⌂</span>วันนี้</button>
-    <button class="nav-btn" data-page="calendar-page" type="button"><span>▣</span>ปฏิทิน</button>
+    <button class="nav-btn active" data-page="calendar-page" type="button"><span>▣</span>ปฏิทิน</button>
     <button class="nav-btn" data-page="tasks-page" type="button"><span>✓</span>งาน</button>
     <button class="nav-btn" data-page="freelance-page" type="button"><span>฿</span>งานนอก</button>
+    <button class="nav-btn" data-page="today-page" type="button"><span>⌂</span>วันนี้</button>
   </nav>
 </div>
 

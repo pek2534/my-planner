@@ -5,9 +5,9 @@
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
-  "background_color": "#ffffff",
-  "theme_color": "#2878ff",
-  "description": "Personal life planner v1.2 with daily planning, cloud sync, multi-day appointments, freelance tracking and photo attachments",
+  "background_color": "#f2ece3",
+  "theme_color": "#75624b",
+  "description": "Personal life planner v1.3 with calendar-first earth-tone UI, daily planning, cloud sync, multi-day appointments, freelance tracking and photo attachments",
   "icons": [
     {
       "src": "icon.svg",
